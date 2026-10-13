@@ -9,8 +9,29 @@ walk up with a card and a book, and you stamp **APPROVED** or **DENIED**. The
 library core acts as the referee: it checks every decision you make against
 the same rules the admin panel enforces.
 
-> 🚧 Work in progress. The core, the database and the back office are done;
-> the desk game is next.
+## The desk game
+
+A seven-day career at the circulation desk, in the spirit of *Papers, Please*.
+
+- **Each morning** the director's memo introduces new rules: expired cards on day 1, borrowed and forged
+  cards on day 2, unpaid fines and overdue books on day 3, and so on, up to exam week (students limited to
+  three books) and inspection day.
+- **At the desk** patrons walk up one at a time with a card and a book. Some things you can see (the expiry
+  date, the photo, a red REFERENCE sticker, a hold slip with someone else's name); the rest you have to look
+  up on the green-screen terminal (forged numbers, lost cards, unpaid fines, overdue books, renewal counts).
+- **You stamp APPROVED or DENIED**, citing the rule when you refuse. Returns are stamped RECEIVED or DAMAGED
+  after you inspect the book for coffee rings and torn covers.
+- **The library core is the referee.** Your decision is carried out through the same services the back office
+  uses and graded against the core's own verdict. Lending against the rules still goes through, but it is
+  recorded as a librarian override with the broken rules attached, and you get a citation.
+- **Every evening** wages, citation penalties, rent and lunch are settled. Fall too far into debt and you're
+  fired; survive the week for a performance review, then keep working for as long as you like.
+
+Patrons are not scripted. Each one is built from the library's real state (an actual member, their actual card
+and account, a copy that is really on the shelf) and checked against the core before they reach the desk, so
+every troublemaker breaks exactly the rule their story is about, and never one you haven't been taught. While
+you're at home, the rest of the town keeps borrowing and returning books, so tomorrow's queue grows out of
+today's library. The whole career is saved in the same SQLite file as the library.
 
 ## The back office
 
@@ -34,9 +55,10 @@ src/core/   Domain model and services in pure TypeScript (no UI, no database)
   services/   CatalogService, MemberService, LendingService, ReservationService, FineService
   Library.ts  Facade that wires the services together
 src/db/     SQLite (sql.js / WebAssembly) implementation of the core's repository interfaces
-src/ui/     React app: title screen and back office (hash routing, no UI framework)
-src/game/   The desk game (planned)
-tests/      Vitest suites for the core and the database
+src/sim/    Background library life: patrons borrowing, returning and paying, through the public services
+src/game/   The desk game in pure TypeScript: campaign, scenario builders, judge, economy, terminal
+src/ui/     React app: title screen, desk game and back office (hash routing, no UI framework)
+tests/      Vitest suites for the core, the database and the game
 scripts/    Browser end-to-end test and screenshot tool (Puppeteer + local Chrome)
 ```
 
@@ -51,6 +73,13 @@ scripts/    Browser end-to-end test and screenshot tool (Puppeteer + local Chrom
   `UNIQUE` and foreign-key constraints.
 - **The save file is the database.** The whole library exports as a single
   `.sqlite` file that any SQLite browser can open.
+- **The game never bypasses the library.** It only decides who walks up to the
+  desk; every change to the library goes through the core's services, so the
+  back office always shows a consistent library, overrides and all.
+- **The game is tested by playing it.** The test suite plays a full career as a
+  perfect librarian (who must never be cited), as one who approves everything
+  (who must be), and as one who refuses everyone (who must be fired), checking
+  on every patron that the scenario is fair.
 
 ## Getting started
 

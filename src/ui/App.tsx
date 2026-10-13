@@ -12,6 +12,7 @@ import { MembersPage } from './admin/MembersPage';
 import { PolicyPage } from './admin/PolicyPage';
 import { ReservationsPage } from './admin/ReservationsPage';
 import { Toasts } from './components/ui';
+import { GameRoute } from './game/GameRoute';
 import { Home } from './Home';
 import { useRoute } from './state/router';
 import { bootLibrary, SessionProvider, useSession } from './state/session';
@@ -65,6 +66,7 @@ function Routes() {
     window.scrollTo(0, 0);
   }, [area, section, id]);
 
+  if (area === 'desk') return <GameRoute />;
   if (area !== 'admin') return <Home />;
 
   const numericId = id !== undefined ? Number(id) : NaN;

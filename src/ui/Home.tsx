@@ -1,11 +1,13 @@
+import { SqliteGameStore } from '../db/repositories/game';
 import { formatLongDate } from './format';
 import { Link } from './state/router';
 import { useSession } from './state/session';
 
 /** The title screen: the game's front door, and the back office's side door. */
 export function Home() {
-  const { library, clock } = useSession();
+  const { library, clock, db } = useSession();
   const s = library.reports.snapshot();
+  const career = new SqliteGameStore(db).load();
 
   return (
     <main className="home">
@@ -22,12 +24,12 @@ export function Home() {
       </p>
 
       <div className="home__doors">
-        <div className="door door--locked" aria-disabled="true">
+        <Link to="/desk" className="door door--desk">
           <div className="door__label">Front desk</div>
-          <h2 className="door__title">Start your shift</h2>
+          <h2 className="door__title">{career ? 'Back to the desk' : 'Start your shift'}</h2>
           <p>Work the circulation desk, one patron at a time. Catch the forged cards before the auditors do.</p>
-          <span className="door__soon">Under construction</span>
-        </div>
+          <span className="door__go">{career ? `Continue: day ${career.day} →` : 'Apply for the job →'}</span>
+        </Link>
 
         <Link to="/admin" className="door">
           <div className="door__label">Staff only</div>

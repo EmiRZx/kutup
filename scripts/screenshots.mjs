@@ -71,6 +71,8 @@ try {
     await page.screenshot({ path: `${outDir}/${screen.name}.png`, fullPage: screen.fullPage ?? false });
     console.log(`✓ ${screen.name}`);
   }
+
+  await gameTour(page);
 } finally {
   await browser.close();
 }
@@ -78,4 +80,66 @@ try {
 if (errors.length > 0) {
   console.error(errors.join('\n'));
   process.exit(1);
+}
+
+/** Plays the first day of a new career, photographing each phase. */
+async function gameTour(page) {
+  const shot = async (name, fullPage = false) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await page.screenshot({ path: `${outDir}/${name}.png`, fullPage });
+    console.log(`✓ ${name}`);
+  };
+  const click = async (label) => {
+    const [button] = await page.$$(`xpath/.//button[contains(normalize-space(.), "${label}")]`);
+    if (!button) throw new Error(`No button "${label}"`);
+    await button.click();
+  };
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await page.goto(`${baseUrl}#/desk`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('.letter, .newspaper, .desk-scene, .ledger-sheet, .review', { timeout: 15000 });
+  if (!(await page.$('.letter'))) {
+    // An earlier career exists: start over from the review screen or via the hiring letter.
+    await page.goto(`${baseUrl}#/`, { waitUntil: 'networkidle0' });
+    page.once('dialog', (d) => d.accept());
+    await page.goto(`${baseUrl}#/admin`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('.admin');
+    await click('Reset sample');
+    await page.waitForFunction(() => document.body.textContent?.includes('A fresh sample library is ready'));
+    await page.goto(`${baseUrl}#/desk`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('.letter');
+  }
+  await shot('game-letter');
+  await click('Accept the post');
+  await page.waitForSelector('.newspaper');
+  await shot('game-bulletin', true);
+  await click('Open the doors');
+  await page.waitForSelector('.patron');
+  await shot('game-desk');
+
+  // Scan whatever is on the desk, then stamp it.
+  for (let served = 0; served < 12; served++) {
+    if (await page.$('.booth__empty')) break;
+    const card = await page.$('.desk-card__number');
+    if (card) await card.click();
+    await (await page.$('.barcode'))?.click();
+    if (served === 1) await shot('game-terminal');
+    if (await page.$('.desk-card')) {
+      await click(served % 3 === 2 ? 'Denied' : 'Approved');
+      if (await page.$('.reasons')) {
+        const [reason] = await page.$$('.reason');
+        await reason.click();
+      }
+    } else {
+      await click(served % 2 ? 'Damaged' : 'Received');
+    }
+    await page.waitForSelector('.stamp-mark');
+    if (served === 0 || (await page.$('.citation'))) await shot(served === 0 ? 'game-stamped' : 'game-citation');
+    await click('Next, please');
+    await page.waitForSelector('.patron, .booth__empty');
+  }
+  await page.waitForSelector('.booth__empty');
+  await shot('game-closed');
+  await click('Close up for the day');
+  await page.waitForSelector('.ledger-sheet');
+  await shot('game-ledger', true);
 }

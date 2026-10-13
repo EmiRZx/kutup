@@ -9,6 +9,7 @@ import './ui/styles/base.css';
 import './ui/styles/components.css';
 import './ui/styles/admin.css';
 import './ui/styles/home.css';
+import './ui/styles/game.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './ui/App';

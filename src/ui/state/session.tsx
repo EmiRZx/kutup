@@ -17,7 +17,7 @@ export interface Toast {
   lines?: string[];
 }
 
-interface Opened {
+export interface Opened {
   library: Library;
   db: SqliteDatabase;
   clock: ManualClock;
@@ -32,8 +32,11 @@ export interface Session extends Opened {
    */
   act<T>(change: () => T, success?: string | ((result: T) => string)): T | undefined;
   notify(tone: Tone, title: string, lines?: string[]): void;
-  /** Swaps in a different library: an uploaded save file, or a fresh sample. */
-  replace(bytes: Uint8Array | 'sample'): void;
+  /**
+   * Swaps in a different library: an uploaded save file, or a fresh sample.
+   * `prepare` runs on the new library before it is saved and shown.
+   */
+  replace(bytes: Uint8Array | 'sample', prepare?: (opened: Opened) => void): boolean;
   toasts: Toast[];
   dismiss(id: number): void;
 }
@@ -115,17 +118,20 @@ export function SessionProvider({ sql, initial, children }: { sql: SqlJsStatic; 
   );
 
   const replace = useCallback(
-    (source: Uint8Array | 'sample') => {
+    (source: Uint8Array | 'sample', prepare?: (opened: Opened) => void) => {
       try {
         const next = source === 'sample' ? openSample(sql) : (openLibrary(sql, { bytes: source }) as Opened);
+        prepare?.(next);
         opened.db.close();
         setOpened(next);
         setRevision((r) => r + 1);
         if (source === 'sample') void forgetSavedLibrary().then(() => saveLibrary(next.db.export()));
         else void saveLibrary(next.db.export());
-        notify('ok', source === 'sample' ? 'A fresh sample library is ready' : 'Library file loaded');
+        if (!prepare) notify('ok', source === 'sample' ? 'A fresh sample library is ready' : 'Library file loaded');
+        return true;
       } catch (error) {
         notify('danger', 'That file could not be opened as a Kutup library', [String(error)]);
+        return false;
       }
     },
     [sql, opened.db, notify],

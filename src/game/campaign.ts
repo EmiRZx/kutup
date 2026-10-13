@@ -76,7 +76,7 @@ const CAMPAIGN: readonly DayPlan[] = [
     introduces: ['valid-borrow', 'expired-card', 'return-good', 'return-damaged'],
     patrons: 7,
     notices: [
-      'Check every card’s expiry date against today’s date on the wall calendar.',
+      'Click a card number or a barcode to look it up on the terminal.',
       'Inspect returned books. Damaged copies are stamped DAMAGED and sent to the bindery.',
     ],
   },
@@ -166,7 +166,8 @@ export function isHonest(kind: ScenarioKind): boolean {
 export function deckFor(day: number, pick: <T>(items: readonly T[]) => T, shuffle: <T>(items: readonly T[]) => T[]): ScenarioKind[] {
   const plan = planFor(day);
   const available = kindsUpTo(day);
-  const honest = available.filter(isHonest);
+  // Borrowers are the heart of the job, so honest borrowers come twice as often as honest returns.
+  const honest = available.filter(isHonest).flatMap((k) => (k === 'return-good' ? [k] : [k, k]));
   const trouble = available.filter((k) => !isHonest(k));
   const fresh = plan.introduces.filter((k) => !isHonest(k));
   const deck: ScenarioKind[] = [...fresh]; // everything new shows up at least once

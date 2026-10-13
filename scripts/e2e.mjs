@@ -28,7 +28,7 @@ try {
 
   const go = async (hash) => {
     await page.goto(`${baseUrl}#${hash}`, { waitUntil: 'networkidle0' });
-    await page.waitForSelector('.admin, .home', { timeout: 20000 });
+    await page.waitForSelector('.admin, .home, .paperwork, .desk-scene', { timeout: 20000 });
   };
   const text = () => page.$eval('.main', (el) => el.textContent ?? '');
   const clickButton = async (label) => {
@@ -130,6 +130,37 @@ try {
     await editor.type('DELETE FROM members');
     await clickButton('Run query');
     await page.waitForSelector('.notice--danger');
+  });
+
+  await step('the desk game: hired, briefed, first patron stamped', async () => {
+    await go('/desk');
+    await page.waitForSelector('.letter');
+    await clickButton('Accept the post');
+    await page.waitForSelector('.newspaper');
+    assert.ok((await page.$eval('.newspaper', (el) => el.textContent ?? '')).includes('Card expired'));
+    await clickButton('Open the doors');
+    await page.waitForSelector('.patron');
+    const [stamp] = await page.$$('xpath/.//button[normalize-space(.)="Received" or normalize-space(.)="Approved"]');
+    await stamp.click();
+    await page.waitForSelector('.stamp-mark');
+    assert.ok((await page.$eval('.desk__status', (el) => el.textContent ?? '')).includes('Served 1'));
+  });
+
+  await step('a reload mid-shift puts you back at the desk', async () => {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('.desk-scene', { timeout: 20000 });
+    await page.waitForSelector('.patron, .booth__empty');
+    assert.ok((await page.$eval('.desk__status', (el) => el.textContent ?? '')).includes('Served 1'));
+  });
+
+  await step('the back office sees the game’s library', async () => {
+    await go('/admin/database');
+    const editor = await page.$('textarea');
+    await editor.evaluate((el) => el.select());
+    await editor.type('SELECT count(*) AS served FROM game_encounters');
+    await clickButton('Run query');
+    await page.waitForFunction(() => document.querySelector('.sql-result td')?.textContent === '1');
   });
 } finally {
   await browser.close();

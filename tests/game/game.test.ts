@@ -8,6 +8,7 @@ import { CAMPAIGN_DAYS, kindsUpTo, knownRules, TARGET } from '../../src/game/cam
 import { ECONOMY, ledgerFor, reviewFor } from '../../src/game/economy';
 import { CLOSING_MINUTES, Game } from '../../src/game/Game';
 import { buildEncounter } from '../../src/game/scenarios';
+import { lookup } from '../../src/game/terminal';
 import { SCENARIO_KINDS, type Decision, type Encounter, type ScenarioKind } from '../../src/game/types';
 import { loadSql } from '../helpers';
 
@@ -220,5 +221,30 @@ describe('economy', () => {
     });
     const ledger = ledgerFor([record(true, null), record(true, null), record(false, 'x'), record(false, 'y'), record(false, 'z')]);
     expect(ledger).toMatchObject({ served: 5, correct: 2, citations: 3, wages: 600, penalties: 500, expenses: 1400, net: -1300 });
+  });
+});
+
+describe('the desk terminal', () => {
+  it('shows what the desk cannot', async () => {
+    const { library } = await newCareer();
+    const ctx = { library, random: new Random(5), day: 7, index: 0, known: knownRules(7), seen: new Set<number>() };
+    const text = (query: string) => lookup(library, query).map((l) => l.text).join('\n');
+
+    const forged = buildEncounter('forged-card', ctx)!;
+    expect(text(forged.card!.number)).toContain('NO RECORD');
+
+    const lost = buildEncounter('lost-card', ctx)!;
+    expect(text(lost.card!.number)).toContain('REPORTED LOST');
+
+    const fines = buildEncounter('fines', ctx)!;
+    expect(lookup(library, fines.card!.number).find((l) => l.text.startsWith('OWES'))?.tone).toBe('alert');
+
+    const reference = buildEncounter('reference', ctx)!;
+    expect(text(reference.book.barcode)).toContain('REFERENCE ONLY');
+
+    const renew = buildEncounter('renew-limit', ctx)!;
+    expect(lookup(library, renew.book.barcode).find((l) => l.text.startsWith('RENEWED'))?.tone).toBe('alert');
+
+    expect(text('hello')).toContain('SYNTAX ERROR');
   });
 });
