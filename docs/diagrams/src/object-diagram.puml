@@ -1,17 +1,20 @@
 @startuml object-diagram
 !include style.iuml
-title Kutup - Object diagram: Friday 16 October 2026, 12:20, day 3 of the career.\nBaran Yıldız (who owes a $15.00 damage fee for Emma) asks to borrow Hamlet; the librarian stamps DENIED: Unpaid fines.
+title Kutup - Object diagram: the library on Friday 16 October 2026.\nBaran Yıldız owes a $15.00 damage fee for a copy of Emma he returned torn. He asks to borrow Hamlet;\nlending.checkCheckout() refuses: unpaid fines over the $5.00 limit.
 
-package "The library at that moment (core + db)" {
-
+package "Running system" {
   object "<u>library : Library</u>" as library
   object "<u>store : SqliteLibraryStore</u>" as store
+  object "<u>database : SqliteDatabase</u>" as database
   object "<u>clock : StoredClock</u>" as clock {
     current = 2026-10-16
   }
   object "<u>lending : LendingService</u>" as lending
   object "<u>fines : FineService</u>" as fines
+  object "<u>reservations : ReservationService</u>" as reservations
+}
 
+package "Rule book" {
   object "<u>policy : LendingPolicy</u>" as policy {
     dailyFine = 25
     maxFinePerLoan = 1000
@@ -40,7 +43,9 @@ package "The library at that moment (core + db)" {
     maxRenewals = 0
     cardValidityDays = 30
   }
+}
 
+package "Baran's account" {
   object "<u>baran : Member</u>" as baran {
     id = 9
     name = "Baran Yıldız"
@@ -57,7 +62,6 @@ package "The library at that moment (core + db)" {
     expiresOn = 2027-09-13
     status = active
   }
-
   object "<u>loan61 : Loan</u>" as loan61 {
     id = 61
     copyId = 4
@@ -79,6 +83,9 @@ package "The library at that moment (core + db)" {
     status = unpaid
     settledOn = null
   }
+}
+
+package "Catalog" {
   object "<u>emmaCopy : BookCopy</u>" as emmaCopy {
     id = 4
     bookId = 2
@@ -100,7 +107,6 @@ package "The library at that moment (core + db)" {
     name = "Jane Austen"
     birthYear = null
   }
-
   object "<u>hamletCopy : BookCopy</u>" as hamletCopy {
     id = 55
     bookId = 37
@@ -122,7 +128,14 @@ package "The library at that moment (core + db)" {
     name = "William Shakespeare"
     birthYear = null
   }
+}
 
+package "The request and the answer" {
+  object "<u>request : CheckoutRequest</u>" as request {
+    memberId = 9
+    cardNumber = "84390079"
+    barcode = "B00037-01"
+  }
   object "<u>assessment : CheckoutAssessment</u>" as assessment {
     allowed = false
     overridable = true
@@ -134,124 +147,46 @@ package "The library at that moment (core + db)" {
   }
 }
 
-package "The game at that moment" {
-
-  object "<u>game : Game</u>" as game
-  object "<u>gameStore : SqliteGameStore</u>" as gameStore
-
-  object "<u>state : CareerState</u>" as state {
-    day = 3
-    savings = 4200
-    status = open
-    seed = 7
-    minutes = 200
-    endless = false
-  }
-  object "<u>bulletin : Bulletin</u>" as bulletin {
-    headline = "Director demands fines be collected"
-    newRules = [FINES_OUTSTANDING, HAS_OVERDUE_LOANS]
-    notices = [2 notices]
-    suspended = []
-  }
-
-  object "<u>encounter : Encounter</u>" as encounter {
-    day = 3
-    index = 8
-    kind = fines
-    request = borrow
-    patron = {memberId = 9, name = "Baran Yıldız"}
-    loanId = null
-    greeting = "Morning. I'm Baran, I'd like to check this out."
-  }
-  object "<u>deskCard : DeskCard</u>" as deskCard {
-    number = "84390079"
-    name = "Baran Yıldız"
-    memberType = student
-    expiresOn = 2027-09-13
-    photoSeed = 9
-  }
-  object "<u>deskBook : DeskBook</u>" as deskBook {
-    barcode = "B00037-01"
-    title = "Hamlet"
-    author = "William Shakespeare"
-    referenceOnly = false
-    holdSlip = null
-    damaged = false
-    coverSeed = 37
-  }
-
-  object "<u>decision : Deny</u>" as decision {
-    type = deny
-    reason = FINES_OUTSTANDING
-  }
-  object "<u>verdict : Verdict</u>" as verdict {
-    correct = true
-    citation = null
-    warning = null
-    reply = "I'll pay next week."
-    mood = annoyed
-  }
-  object "<u>record : EncounterRecord</u>" as record {
-    day = 3
-    index = 8
-    kind = fines
-    request = borrow
-    memberId = 9
-    barcode = "B00037-01"
-    cardNumber = "84390079"
-    decision = deny
-    reason = "FINES_OUTSTANDING"
-    correct = true
-    citation = null
-    warning = null
-  }
-}
-
-' --- Library wiring ---
+' --- The running system ---
 library -- store : store
 library -- clock : clock
-library -- lending : lending
-library -- fines : fines
-store -- policy : policy (loaded)
+library *-- lending : lending
+library *-- fines : fines
+library *-- reservations : reservations
+store -- database : db
+clock -- database : calendar table
+lending -- fines : fines
+lending -- reservations : reservations
+library ..> policy : «get» policy (loaded from the store)
 policy *-- studentRules : student
 policy *-- staffRules : staff
 policy *-- guestRules : guest
 
-' --- The member and their history ---
+' --- Baran's account and history ---
 baran -- card9 : holds
 baran -- loan61 : borrows
+baran -- fine16 : owes
+fine16 -- loan61 : charged for
 loan61 -- emmaCopy : lent in
 emmaCopy -- emma : copy of
 emma -- austen : written by
-baran -- fine16 : owes
-fine16 -- loan61 : charged for
 
-' --- The book on the desk ---
+' --- The book he wants ---
 hamletCopy -- hamlet : copy of
 hamlet -- shakespeare : written by
 
-' --- What lending.checkCheckout() returned ---
-lending ..> assessment : checkCheckout()
+' --- checkCheckout(request) ---
+lending ..> request : checkCheckout(request)
+lending ..> assessment : returns
 assessment -- baran : member
 assessment -- card9 : card
 assessment -- hamletCopy : copy
 assessment -- hamlet : book
 assessment -- violation : violations
 
-' --- The game ---
-game -- library : library
-game -- gameStore : store
-game -- clock : clock
-game *-- state : current
-state *-- bulletin
-encounter *-- deskCard : card
-encounter *-- deskBook : book
-game ..> encounter : nextEncounter(200)
-game ..> verdict : decide(encounter, decision, 200)
-decision <.. verdict : graded
-verdict -- violation : truth
-gameStore ..> record : addEncounter()
-deskCard ..> card9 : «shows»
-deskBook ..> hamletCopy : «shows»
-encounter ..> baran : patron.memberId = 9
+note bottom of violation
+  fine16.amount (1500) >= policy.fineBlockThreshold (500),
+  so the loan is refused. A librarian could still
+  override it with a written note (overridable = true).
+end note
 @enduml

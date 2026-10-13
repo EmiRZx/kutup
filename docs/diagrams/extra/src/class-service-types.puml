@@ -1,7 +1,7 @@
-@startuml class-3-service-types
-!include style.iuml
+@startuml class-service-types
+!include ../../src/style.iuml
 left to right direction
-title Kutup - Class diagram, sheet 3 of 6: data types the services take and return (src/core/services)
+title Kutup - Extra class diagram: data types the services take and return (src/core/services)
 
 package "core.services" {
 

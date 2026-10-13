@@ -1,7 +1,7 @@
-@startuml class-4-persistence
+@startuml class-3-storage
 !include style.iuml
 left to right direction
-title Kutup - Class diagram, sheet 4 of 6: storage contracts (src/core/repositories.ts) and their SQLite implementation (src/db)
+title Kutup - Class diagram, sheet 3 of 3: storage contracts (src/core/repositories.ts) and their SQLite implementation (src/db)
 
 package "core.repositories" {
 
@@ -186,10 +186,6 @@ package "db" {
       - db : SqliteDatabase
       + constructor(db : SqliteDatabase)
     }
-    class SqliteGameStore {
-      - db : SqliteDatabase
-      + constructor(db : SqliteDatabase)
-    }
     class catalogRepo <<utility>> {
       + {static} likePattern(query : string) : string
     }
@@ -262,7 +258,6 @@ package "external: sql.js (SQLite compiled to WebAssembly)" as sqljs {
 package "other sheets" as others {
   class ManualClock
   class MemberServiceOptions <<interface>>
-  interface GameStore <<interface>>
 }
 
 ' --- The store aggregates the repositories ---
@@ -287,7 +282,6 @@ LoanRepository <|.. SqliteLoanRepository
 ReservationRepository <|.. SqliteReservationRepository
 FineRepository <|.. SqliteFineRepository
 PolicyRepository <|.. SqlitePolicyRepository
-GameStore <|.. SqliteGameStore
 
 SqliteLibraryStore *-- "1" SqliteAuthorRepository
 SqliteLibraryStore *-- "1" SqliteBookRepository
@@ -315,7 +309,7 @@ openLibrary ..> seeding : sample data
 MemberServiceOptions <|-- OpenLibraryOptions
 seeding ..> SeedBook
 
-note right of SqliteGameStore
+note right of SqlitePolicyRepository
   Each Sqlite*Repository implements every
   operation of its interface (not repeated here).
   Rows are mapped to entities by module functions

@@ -1,0 +1,257 @@
+@startuml object-diagram-with-game
+!include ../../src/style.iuml
+title Kutup - Extra object diagram (library + game): Friday 16 October 2026, 12:20, day 3 of the career.\nBaran Yıldız (who owes a $15.00 damage fee for Emma) asks to borrow Hamlet; the librarian stamps DENIED: Unpaid fines.
+
+package "The library at that moment (core + db)" {
+
+  object "<u>library : Library</u>" as library
+  object "<u>store : SqliteLibraryStore</u>" as store
+  object "<u>clock : StoredClock</u>" as clock {
+    current = 2026-10-16
+  }
+  object "<u>lending : LendingService</u>" as lending
+  object "<u>fines : FineService</u>" as fines
+
+  object "<u>policy : LendingPolicy</u>" as policy {
+    dailyFine = 25
+    maxFinePerLoan = 1000
+    fineBlockThreshold = 500
+    holdDays = 3
+    blockWhenOverdue = true
+    referenceLoansAllowed = false
+    damageFee = 1500
+    lostFee = 3000
+  }
+  object "<u>studentRules : MemberTypeRules</u>" as studentRules {
+    maxLoans = 5
+    loanDays = 14
+    maxRenewals = 2
+    cardValidityDays = 365
+  }
+  object "<u>staffRules : MemberTypeRules</u>" as staffRules {
+    maxLoans = 10
+    loanDays = 28
+    maxRenewals = 3
+    cardValidityDays = 730
+  }
+  object "<u>guestRules : MemberTypeRules</u>" as guestRules {
+    maxLoans = 2
+    loanDays = 7
+    maxRenewals = 0
+    cardValidityDays = 30
+  }
+
+  object "<u>baran : Member</u>" as baran {
+    id = 9
+    name = "Baran Yıldız"
+    type = student
+    email = "baran.yildiz@kutup.edu"
+    status = active
+    joinedOn = 2026-09-13
+  }
+  object "<u>card9 : LibraryCard</u>" as card9 {
+    id = 9
+    memberId = 9
+    number = "84390079"
+    issuedOn = 2026-09-13
+    expiresOn = 2027-09-13
+    status = active
+  }
+
+  object "<u>loan61 : Loan</u>" as loan61 {
+    id = 61
+    copyId = 4
+    memberId = 9
+    borrowedOn = 2026-10-04
+    dueOn = 2026-10-18
+    returnedOn = 2026-10-14
+    renewals = 0
+    overriddenViolations = []
+    overrideNote = null
+  }
+  object "<u>fine16 : Fine</u>" as fine16 {
+    id = 16
+    memberId = 9
+    loanId = 61
+    amount = 1500
+    reason = damage
+    issuedOn = 2026-10-14
+    status = unpaid
+    settledOn = null
+  }
+  object "<u>emmaCopy : BookCopy</u>" as emmaCopy {
+    id = 4
+    bookId = 2
+    barcode = "B00002-01"
+    status = in_repair
+    condition = damaged
+    acquiredOn = 2026-09-13
+  }
+  object "<u>emma : Book</u>" as emma {
+    id = 2
+    isbn = "9789900000020"
+    title = "Emma"
+    publishedYear = 1815
+    genre = fiction
+    referenceOnly = false
+  }
+  object "<u>austen : Author</u>" as austen {
+    id = 1
+    name = "Jane Austen"
+    birthYear = null
+  }
+
+  object "<u>hamletCopy : BookCopy</u>" as hamletCopy {
+    id = 55
+    bookId = 37
+    barcode = "B00037-01"
+    status = available
+    condition = good
+    acquiredOn = 2026-09-13
+  }
+  object "<u>hamlet : Book</u>" as hamlet {
+    id = 37
+    isbn = "9789900000372"
+    title = "Hamlet"
+    publishedYear = 1603
+    genre = drama
+    referenceOnly = false
+  }
+  object "<u>shakespeare : Author</u>" as shakespeare {
+    id = 29
+    name = "William Shakespeare"
+    birthYear = null
+  }
+
+  object "<u>assessment : CheckoutAssessment</u>" as assessment {
+    allowed = false
+    overridable = true
+    dueOn = 2026-10-30
+  }
+  object "<u>unpaidFines : Violation</u>" as violation {
+    code = FINES_OUTSTANDING
+    message = "The member owes more in fines than the policy allows."
+  }
+}
+
+package "The game at that moment" {
+
+  object "<u>game : Game</u>" as game
+  object "<u>gameStore : SqliteGameStore</u>" as gameStore
+
+  object "<u>state : CareerState</u>" as state {
+    day = 3
+    savings = 4200
+    status = open
+    seed = 7
+    minutes = 200
+    endless = false
+  }
+  object "<u>bulletin : Bulletin</u>" as bulletin {
+    headline = "Director demands fines be collected"
+    newRules = [FINES_OUTSTANDING, HAS_OVERDUE_LOANS]
+    notices = [2 notices]
+    suspended = []
+  }
+
+  object "<u>encounter : Encounter</u>" as encounter {
+    day = 3
+    index = 8
+    kind = fines
+    request = borrow
+    patron = {memberId = 9, name = "Baran Yıldız"}
+    loanId = null
+    greeting = "Morning. I'm Baran, I'd like to check this out."
+  }
+  object "<u>deskCard : DeskCard</u>" as deskCard {
+    number = "84390079"
+    name = "Baran Yıldız"
+    memberType = student
+    expiresOn = 2027-09-13
+    photoSeed = 9
+  }
+  object "<u>deskBook : DeskBook</u>" as deskBook {
+    barcode = "B00037-01"
+    title = "Hamlet"
+    author = "William Shakespeare"
+    referenceOnly = false
+    holdSlip = null
+    damaged = false
+    coverSeed = 37
+  }
+
+  object "<u>decision : Deny</u>" as decision {
+    type = deny
+    reason = FINES_OUTSTANDING
+  }
+  object "<u>verdict : Verdict</u>" as verdict {
+    correct = true
+    citation = null
+    warning = null
+    reply = "I'll pay next week."
+    mood = annoyed
+  }
+  object "<u>record : EncounterRecord</u>" as record {
+    day = 3
+    index = 8
+    kind = fines
+    request = borrow
+    memberId = 9
+    barcode = "B00037-01"
+    cardNumber = "84390079"
+    decision = deny
+    reason = "FINES_OUTSTANDING"
+    correct = true
+    citation = null
+    warning = null
+  }
+}
+
+' --- Library wiring ---
+library -- store : store
+library -- clock : clock
+library -- lending : lending
+library -- fines : fines
+store -- policy : policy (loaded)
+policy *-- studentRules : student
+policy *-- staffRules : staff
+policy *-- guestRules : guest
+
+' --- The member and their history ---
+baran -- card9 : holds
+baran -- loan61 : borrows
+loan61 -- emmaCopy : lent in
+emmaCopy -- emma : copy of
+emma -- austen : written by
+baran -- fine16 : owes
+fine16 -- loan61 : charged for
+
+' --- The book on the desk ---
+hamletCopy -- hamlet : copy of
+hamlet -- shakespeare : written by
+
+' --- What lending.checkCheckout() returned ---
+lending ..> assessment : checkCheckout()
+assessment -- baran : member
+assessment -- card9 : card
+assessment -- hamletCopy : copy
+assessment -- hamlet : book
+assessment -- violation : violations
+
+' --- The game ---
+game -- library : library
+game -- gameStore : store
+game -- clock : clock
+game *-- state : current
+state *-- bulletin
+encounter *-- deskCard : card
+encounter *-- deskBook : book
+game ..> encounter : nextEncounter(200)
+game ..> verdict : decide(encounter, decision, 200)
+decision <.. verdict : graded
+verdict -- violation : truth
+gameStore ..> record : addEncounter()
+deskCard ..> card9 : «shows»
+deskBook ..> hamletCopy : «shows»
+encounter ..> baran : patron.memberId = 9
+@enduml

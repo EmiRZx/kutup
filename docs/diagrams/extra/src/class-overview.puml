@@ -1,6 +1,6 @@
-@startuml class-6-overview
-!include style.iuml
-title Kutup - Class diagram, sheet 6 of 6: packages, their dependencies, and the user interface (src/ui)
+@startuml class-overview
+!include ../../src/style.iuml
+title Kutup - Extra class diagram: packages, their dependencies, and the user interface (src/ui)
 
 package "ui (React 19 function components)" as ui {
 

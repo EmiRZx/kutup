@@ -1,6 +1,6 @@
 @startuml class-1-domain
 !include style.iuml
-title Kutup - Class diagram, sheet 1 of 6: domain model (src/core/model)
+title Kutup - Class diagram, sheet 1 of 3: domain model (src/core/model)
 
 package "core.model" {
 

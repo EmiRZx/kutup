@@ -1,6 +1,6 @@
 @startuml class-2-services
 !include style.iuml
-title Kutup - Class diagram, sheet 2 of 6: services, facade, clock and errors (src/core)
+title Kutup - Class diagram, sheet 2 of 3: services, facade, clock and errors (src/core)
 
 package "core" {
 
@@ -209,7 +209,7 @@ package "core" {
   }
 
   interface LibraryStore <<interface>> {
-    (see sheet 4)
+    (see sheet 3)
   }
 
   package "model (see sheet 1)" as modelRef {

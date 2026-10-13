@@ -1,0 +1,110 @@
+@startuml deployment-diagram-with-ci
+!include ../../src/style.iuml
+skinparam linetype polyline
+title Kutup - Extra deployment diagram (with build pipeline): a static web app; the whole library, SQLite included, runs inside the player's browser
+
+node "Player's computer" <<device>> as pc {
+  node "Web browser\n(Chrome, Edge, Firefox, Safari)" <<executionEnvironment>> as browser {
+
+    node "JavaScript engine" <<executionEnvironment>> as js {
+      component "Kutup app\n(manifested by index-[hash].js)" <<component>> as app {
+        component "ui\n(React 19)" as ui
+        component "game" as game
+        component "sim" as sim
+        component "core\n(library rules)" as core
+        component "db\n(repositories)" as dbc
+      }
+    }
+
+    node "WebAssembly runtime" <<executionEnvironment>> as wasm {
+      component "SQLite 3\n(sql.js, manifested by\nsql-wasm-[hash].wasm)" as sqlite
+      database "Library database\n(in memory, 16 tables,\nschema version 4)" <<database>> as memdb
+    }
+
+    database "IndexedDB\ndatabase 'kutup', store 'saves'" <<storage>> as idb {
+      artifact "library.sqlite\n(bytes of the database file)" <<file>> as save
+    }
+  }
+
+  folder "File system\n(Downloads)" <<storage>> as fs {
+    artifact "kutup.sqlite\n(save file, any SQLite tool can open it)" <<file>> as file
+  }
+}
+
+node "GitHub Pages server\nemirzx.github.io" <<device>> as pages {
+  node "Static web server (HTTPS, CDN)" <<executionEnvironment>> as web {
+    artifact "/kutup/index.html" <<document>> as html
+    artifact "/kutup/assets/index-[hash].js" <<JavaScript bundle>> as bundle
+    artifact "/kutup/assets/index-[hash].css" <<stylesheet>> as css
+    artifact "/kutup/assets/sql-wasm-[hash].wasm" <<WebAssembly module>> as wasmfile
+    artifact "/kutup/assets/*.woff2, *.woff\n(26 + 26 font files)" <<font>> as fonts
+    artifact "/kutup/favicon.svg" <<image>> as icon
+  }
+}
+
+node "GitHub" <<device>> as github {
+  database "Repository EmiRZx/kutup\n(git, branch main)" <<repository>> as repo
+  node "GitHub Actions runner\n(ubuntu-latest)" <<device>> as runner {
+    node "Node.js 22" <<executionEnvironment>> as node22 {
+      component "CI workflow (.github/workflows/ci.yml)\nnpm ci, oxlint, vitest (105 tests),\ntsc + vite build" as ci
+    }
+    node "Headless Google Chrome" <<executionEnvironment>> as chrome {
+      component "End-to-end tests\n(Puppeteer, scripts/e2e.mjs)" as e2e
+    }
+    artifact "dist/ (Pages artifact)" <<artifact>> as dist
+  }
+}
+
+node "Developer's computer" <<device>> as devpc {
+  node "Node.js 22+" <<executionEnvironment>> as devnode {
+    component "Vite dev server\n(npm run dev)" as vite
+    component "Vitest\n(npm test)" as vitest
+  }
+  artifact "Source code\n(TypeScript, git working copy)" <<source>> as src
+}
+
+' --- Layout: players on the left, the server next to them, the build pipeline above ---
+pc -[hidden]right- pages
+devpc -[hidden]down- github
+
+' --- Inside the app ---
+ui ..> game
+ui ..> core
+ui ..> dbc : opens the library
+dbc ..> game : stores the career
+dbc ..> sim : sample history
+game ..> core
+game ..> sim
+sim ..> core
+dbc ..> core : implements contracts
+
+' --- Communication paths ---
+browser -- web : <<HTTPS>>\nGET static files on load;\nno further server calls
+app -- sqlite : <<JS / WebAssembly calls>>\nSQL statements
+sqlite -- memdb
+app -- idb : <<IndexedDB API>>\nautosave after every change,\nrestore on start
+app -- fs : <<download / file picker>>\nSave .sqlite / Open file
+
+devpc -- repo : <<HTTPS>>\ngit push
+repo -- runner : <<push to main>>\ntriggers workflow
+ci -- e2e : vite preview\n(localhost:4173)
+runner -- web : <<HTTPS>>\nactions/deploy-pages
+
+' --- What is deployed where ---
+dist ..> html : <<deploy>>
+dist ..> bundle : <<deploy>>
+dist ..> css : <<deploy>>
+dist ..> wasmfile : <<deploy>>
+dist ..> fonts : <<deploy>>
+dist ..> icon : <<deploy>>
+bundle ..> app : <<manifest>>
+wasmfile ..> sqlite : <<manifest>>
+vite ..> src
+vitest ..> src
+
+note bottom of pages
+  No application server and no backend
+  database: the server only hands out files.
+  Each player's library lives in their own browser.
+end note
+@enduml

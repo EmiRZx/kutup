@@ -1,6 +1,6 @@
-@startuml class-5-game
-!include style.iuml
-title Kutup - Class diagram, sheet 5 of 6: the desk game (src/game) and background life (src/sim)
+@startuml class-game
+!include ../../src/style.iuml
+title Kutup - Extra class diagram: the desk game (src/game) and background life (src/sim)
 
 package "game" {
 
