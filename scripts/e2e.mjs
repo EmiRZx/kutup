@@ -13,7 +13,8 @@ const executablePath =
     linux: '/usr/bin/google-chrome',
   }[process.platform];
 
-const browser = await puppeteer.launch({ executablePath, headless: true });
+// CI runners don't allow Chrome's sandbox.
+const browser = await puppeteer.launch({ executablePath, headless: true, args: process.env.CI ? ['--no-sandbox'] : [] });
 const errors = [];
 
 async function step(name, run) {

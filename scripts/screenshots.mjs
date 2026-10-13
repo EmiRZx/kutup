@@ -53,7 +53,8 @@ const SCREENS = [
 ];
 
 await mkdir(outDir, { recursive: true });
-const browser = await puppeteer.launch({ executablePath, headless: true });
+// CI runners don't allow Chrome's sandbox.
+const browser = await puppeteer.launch({ executablePath, headless: true, args: process.env.CI ? ['--no-sandbox'] : [] });
 const errors = [];
 
 try {
