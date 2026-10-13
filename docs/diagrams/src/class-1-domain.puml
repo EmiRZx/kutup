@@ -1,0 +1,332 @@
+@startuml class-1-domain
+!include style.iuml
+title Kutup - Class diagram, sheet 1 of 6: domain model (src/core/model)
+
+package "core.model" {
+
+  class Author {
+    + id : number {readOnly}
+    + name : string {readOnly}
+    + birthYear : number [0..1] {readOnly}
+    --
+    + constructor(props : AuthorProps)
+    + «get» sortName() : string
+  }
+
+  class Book {
+    + id : number {readOnly}
+    + isbn : string {readOnly}
+    + title : string
+    + authors : Author [1..*]
+    + publishedYear : number [0..1]
+    + genre : Genre
+    + referenceOnly : boolean
+    --
+    + constructor(props : BookProps)
+    + «get» authorLine() : string
+    + matches(query : string) : boolean
+  }
+
+  class BookCopy {
+    + id : number {readOnly}
+    + bookId : number {readOnly}
+    + barcode : string {readOnly}
+    - _status : CopyStatus
+    + condition : CopyCondition
+    + acquiredOn : IsoDate {readOnly}
+    --
+    + constructor(props : BookCopyProps)
+    + «get» status() : CopyStatus
+    + «get» isOnShelf() : boolean
+    + canTransitionTo(next : CopyStatus) : boolean
+    - transition(next : CopyStatus) : void
+    + checkOut() : void
+    + checkIn(condition : CopyCondition) : void
+    + placeOnHold() : void
+    + releaseHold() : void
+    + markLost() : void
+    + sendToRepair() : void
+    + restoreToShelf() : void
+    + withdraw() : void
+  }
+
+  class Member {
+    + id : number {readOnly}
+    + name : string
+    + type : MemberType
+    + email : string [0..1]
+    - _status : MemberStatus
+    + joinedOn : IsoDate {readOnly}
+    --
+    + constructor(props : MemberProps)
+    + «get» status() : MemberStatus
+    + «get» isActive() : boolean
+    + suspend() : void
+    + reinstate() : void
+  }
+
+  class LibraryCard {
+    + id : number {readOnly}
+    + memberId : number {readOnly}
+    + number : string {readOnly}
+    + issuedOn : IsoDate {readOnly}
+    - _expiresOn : IsoDate
+    - _status : CardStatus
+    --
+    + constructor(props : LibraryCardProps)
+    + «get» expiresOn() : IsoDate
+    + «get» status() : CardStatus
+    + «get» printedNumber() : string
+    + isExpiredOn(date : IsoDate) : boolean
+    + isUsableOn(date : IsoDate) : boolean
+    + extendTo(expiresOn : IsoDate) : void
+    + markLost() : void
+    + revoke() : void
+  }
+
+  class Loan {
+    + id : number {readOnly}
+    + copyId : number {readOnly}
+    + memberId : number {readOnly}
+    + borrowedOn : IsoDate {readOnly}
+    - _dueOn : IsoDate
+    - _returnedOn : IsoDate [0..1]
+    - _renewals : number
+    - _overriddenViolations : ViolationCode [0..*]
+    - _overrideNote : string [0..1]
+    --
+    + constructor(props : LoanProps)
+    + «get» dueOn() : IsoDate
+    + «get» returnedOn() : IsoDate [0..1]
+    + «get» renewals() : number
+    + «get» overriddenViolations() : ViolationCode [0..*]
+    + «get» overrideNote() : string [0..1]
+    + «get» wasOverridden() : boolean
+    + «get» isActive() : boolean
+    + isOverdueOn(date : IsoDate) : boolean
+    + daysLate(date : IsoDate) : number
+    + renew(newDueOn : IsoDate) : void
+    + recordOverride(codes : ViolationCode [0..*], note : string [0..1]) : void
+    + close(returnedOn : IsoDate) : void
+  }
+
+  class Reservation {
+    + id : number {readOnly}
+    + bookId : number {readOnly}
+    + memberId : number {readOnly}
+    + createdOn : IsoDate {readOnly}
+    - _status : ReservationStatus
+    - _copyId : number [0..1]
+    - _holdUntil : IsoDate [0..1]
+    --
+    + constructor(props : ReservationProps)
+    + «get» status() : ReservationStatus
+    + «get» copyId() : number [0..1]
+    + «get» holdUntil() : IsoDate [0..1]
+    + «get» isOpen() : boolean
+    + isHoldExpiredOn(date : IsoDate) : boolean
+    + markReady(copyId : number, holdUntil : IsoDate) : void
+    + returnToQueue() : void
+    + fulfill() : void
+    + expire() : void
+    + cancel() : void
+    - expect(status : ReservationStatus, action : string) : void
+  }
+
+  class Fine {
+    + id : number {readOnly}
+    + memberId : number {readOnly}
+    + loanId : number [0..1] {readOnly}
+    + amount : number {readOnly}
+    + reason : FineReason {readOnly}
+    + issuedOn : IsoDate {readOnly}
+    - _status : FineStatus
+    - _settledOn : IsoDate [0..1]
+    --
+    + constructor(props : FineProps)
+    + «get» status() : FineStatus
+    + «get» settledOn() : IsoDate [0..1]
+    + «get» isOutstanding() : boolean
+    + pay(on : IsoDate) : void
+    + waive(on : IsoDate) : void
+    - settle(status : FineStatus, on : IsoDate) : void
+  }
+
+  class LendingPolicy {
+    + rules : Record<MemberType, MemberTypeRules> {readOnly}
+    + dailyFine : number {readOnly}
+    + maxFinePerLoan : number {readOnly}
+    + fineBlockThreshold : number {readOnly}
+    + holdDays : number {readOnly}
+    + blockWhenOverdue : boolean {readOnly}
+    + referenceLoansAllowed : boolean {readOnly}
+    + damageFee : number {readOnly}
+    + lostFee : number {readOnly}
+    --
+    + constructor(props : LendingPolicyProps)
+    + {static} defaults() : LendingPolicy
+    + rulesFor(type : MemberType) : MemberTypeRules
+    + with(changes : Partial<LendingPolicyProps>) : LendingPolicy
+    + toProps() : LendingPolicyProps
+    - {static} validate(props : LendingPolicyProps) : void
+  }
+
+  class MemberTypeRules <<interface>> {
+    + maxLoans : number
+    + loanDays : number
+    + maxRenewals : number
+    + cardValidityDays : number
+  }
+
+  class Violation <<interface>> {
+    + code : ViolationCode {readOnly}
+    + message : string {readOnly}
+  }
+
+  class violations <<utility>> {
+    + {static} VIOLATIONS : Record<ViolationCode, string>
+    - {static} HARD_VIOLATIONS : Set<ViolationCode>
+    --
+    + {static} violation(code : ViolationCode) : Violation
+    + {static} isOverridable(code : ViolationCode) : boolean
+    + {static} isViolationCode(value : string) : boolean
+  }
+
+  class enumValues <<utility>> {
+    + {static} GENRES : Genre [12]
+    + {static} COPY_STATUSES : CopyStatus [6]
+    + {static} COPY_CONDITIONS : CopyCondition [3]
+    + {static} MEMBER_TYPES : MemberType [3]
+    + {static} MEMBER_STATUSES : MemberStatus [2]
+    + {static} CARD_STATUSES : CardStatus [3]
+    + {static} RESERVATION_STATUSES : ReservationStatus [5]
+    + {static} FINE_REASONS : FineReason [3]
+    + {static} FINE_STATUSES : FineStatus [3]
+    --
+    + {static} isGenre(value : string) : boolean
+  }
+
+  class IsoDate <<dataType>> {
+    string "YYYY-MM-DD"
+  }
+
+  package "enumerations" {
+  enum Genre <<enumeration>> {
+    fiction
+    mystery
+    science-fiction
+    fantasy
+    horror
+    poetry
+    drama
+    philosophy
+    history
+    science
+    children
+    reference
+  }
+
+  enum CopyStatus <<enumeration>> {
+    available
+    on_loan
+    on_hold
+    in_repair
+    lost
+    withdrawn
+  }
+
+  enum CopyCondition <<enumeration>> {
+    good
+    worn
+    damaged
+  }
+
+  enum MemberType <<enumeration>> {
+    student
+    staff
+    guest
+  }
+
+  enum MemberStatus <<enumeration>> {
+    active
+    suspended
+  }
+
+  enum CardStatus <<enumeration>> {
+    active
+    lost
+    revoked
+  }
+
+  enum ReservationStatus <<enumeration>> {
+    waiting
+    ready
+    fulfilled
+    cancelled
+    expired
+  }
+
+  enum FineReason <<enumeration>> {
+    overdue
+    damage
+    lost
+  }
+
+  enum FineStatus <<enumeration>> {
+    unpaid
+    paid
+    waived
+  }
+
+  enum ViolationCode <<enumeration>> {
+    CARD_UNKNOWN
+    CARD_MISMATCH
+    CARD_EXPIRED
+    CARD_INACTIVE
+    MEMBER_SUSPENDED
+    LOAN_LIMIT_REACHED
+    FINES_OUTSTANDING
+    HAS_OVERDUE_LOANS
+    COPY_UNAVAILABLE
+    COPY_ON_HOLD_FOR_ANOTHER
+    REFERENCE_ONLY
+    RENEWAL_LIMIT_REACHED
+    LOAN_OVERDUE
+    BOOK_HAS_WAITING_RESERVATIONS
+    ALREADY_RESERVED
+    ALREADY_BORROWED
+    COPY_AVAILABLE_ON_SHELF
+  }
+
+  }
+}
+
+' --- Associations (the *Id fields above are how they are stored) ---
+Book "0..*" --> "1..*" Author : written by >
+Book "1" -- "0..*" BookCopy : copies >
+Member "1" -- "0..*" LibraryCard : holds >
+Member "1" -- "0..*" Loan : borrows >
+BookCopy "1" -- "0..*" Loan : lent in >
+Member "1" -- "0..*" Reservation : places >
+Book "1" -- "0..*" Reservation : queued for <
+Reservation "0..1" -- "0..1" BookCopy : holds copy >
+Member "1" -- "0..*" Fine : owes >
+Loan "0..1" -- "0..*" Fine : charged for <
+LendingPolicy "1" *-- "3" MemberTypeRules : rules {one per MemberType}
+violations ..> Violation : creates
+violations ..> ViolationCode
+
+note right of LibraryCard
+  {at most one card per member
+   has status = active}
+end note
+
+note right of Loan
+  {at most one active loan
+   (returnedOn = null) per copy}
+  Money is always in cents.
+end note
+
+Book -[hidden]down- Genre
+note "Every entity is created from a matching\n«interface» XxxProps (AuthorProps, BookProps,\nBookCopyProps, MemberProps, LibraryCardProps,\nLoanProps, ReservationProps, FineProps,\nLendingPolicyProps) with the same fields.\nAll status changes are guarded state machines:\nan illegal change throws InvalidStateError." as N1
+@enduml

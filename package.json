@@ -2,6 +2,8 @@
   "name": "kutup",
   "private": true,
   "version": "0.0.0",
+  "description": "A library management system disguised as a Papers, Please-style librarian game. TypeScript, React and SQLite in the browser.",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

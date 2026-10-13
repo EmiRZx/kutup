@@ -1,0 +1,14 @@
+' Shared look: black and white, standard UML notation (no icons), easy to copy by hand.
+skinparam monochrome true
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam classFontStyle bold
+skinparam packageStyle frame
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam dpi 110
+hide circle
+hide empty members

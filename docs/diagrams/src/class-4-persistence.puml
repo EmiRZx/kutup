@@ -1,0 +1,325 @@
+@startuml class-4-persistence
+!include style.iuml
+left to right direction
+title Kutup - Class diagram, sheet 4 of 6: storage contracts (src/core/repositories.ts) and their SQLite implementation (src/db)
+
+package "core.repositories" {
+
+  interface LibraryStore <<interface>> {
+    + authors : AuthorRepository {readOnly}
+    + books : BookRepository {readOnly}
+    + copies : CopyRepository {readOnly}
+    + members : MemberRepository {readOnly}
+    + cards : CardRepository {readOnly}
+    + loans : LoanRepository {readOnly}
+    + reservations : ReservationRepository {readOnly}
+    + fines : FineRepository {readOnly}
+    + policy : PolicyRepository {readOnly}
+    --
+    + transaction<T>(work : () => T) : T
+  }
+
+  interface AuthorRepository <<interface>> {
+    + add(draft : Draft<AuthorProps>) : Author
+    + findById(id : number) : Author [0..1]
+    + findByName(name : string) : Author [0..1]
+    + all() : Author [*]
+  }
+
+  interface BookRepository <<interface>> {
+    + add(draft : Draft<BookProps>) : Book
+    + save(book : Book) : void
+    + findById(id : number) : Book [0..1]
+    + findByIsbn(isbn : string) : Book [0..1]
+    + search(query : string) : Book [*]
+    + all() : Book [*]
+  }
+
+  interface CopyRepository <<interface>> {
+    + add(draft : Draft<BookCopyProps>) : BookCopy
+    + save(copy : BookCopy) : void
+    + findById(id : number) : BookCopy [0..1]
+    + findByBarcode(barcode : string) : BookCopy [0..1]
+    + findByBook(bookId : number) : BookCopy [*]
+    + countByBook(bookId : number) : number
+    + countByStatus() : Record<CopyStatus, number>
+  }
+
+  interface MemberRepository <<interface>> {
+    + add(draft : Draft<MemberProps>) : Member
+    + save(member : Member) : void
+    + findById(id : number) : Member [0..1]
+    + search(query : string) : Member [*]
+    + all() : Member [*]
+  }
+
+  interface CardRepository <<interface>> {
+    + add(draft : Draft<LibraryCardProps>) : LibraryCard
+    + save(card : LibraryCard) : void
+    + findById(id : number) : LibraryCard [0..1]
+    + findByNumber(number : string) : LibraryCard [0..1]
+    + findActiveByMember(memberId : number) : LibraryCard [0..1]
+    + findByMember(memberId : number) : LibraryCard [*]
+  }
+
+  interface LoanRepository <<interface>> {
+    + add(draft : Draft<LoanProps>) : Loan
+    + save(loan : Loan) : void
+    + findById(id : number) : Loan [0..1]
+    + findActiveByCopy(copyId : number) : Loan [0..1]
+    + findActiveByMember(memberId : number) : Loan [*]
+    + findByMember(memberId : number) : Loan [*]
+    + findOverdue(date : IsoDate) : Loan [*]
+    + findActive() : Loan [*]
+    + mostBorrowed(limit : number) : {bookId, loans} [*]
+  }
+
+  interface ReservationRepository <<interface>> {
+    + add(draft : Draft<ReservationProps>) : Reservation
+    + save(reservation : Reservation) : void
+    + findById(id : number) : Reservation [0..1]
+    + findOpenByBook(bookId : number) : Reservation [*]
+    + findOpenByMember(memberId : number) : Reservation [*]
+    + findReadyByCopy(copyId : number) : Reservation [0..1]
+    + findReady() : Reservation [*]
+    + findOpen() : Reservation [*]
+  }
+
+  interface FineRepository <<interface>> {
+    + add(draft : Draft<FineProps>) : Fine
+    + save(fine : Fine) : void
+    + findById(id : number) : Fine [0..1]
+    + findByMember(memberId : number) : Fine [*]
+    + findOutstandingByMember(memberId : number) : Fine [*]
+    + totalOutstanding() : number
+  }
+
+  interface PolicyRepository <<interface>> {
+    + load() : LendingPolicy
+    + save(policy : LendingPolicy) : void
+  }
+
+  class "Draft<Props>" as Draft <<dataType>> {
+    Props without id
+  }
+}
+
+package "db" {
+
+  class SqliteDatabase {
+    - db : Database {readOnly}
+    - transactionDepth : number = 0
+    --
+    - constructor(db : Database)
+    + {static} open(sql : SqlJsStatic, bytes : Uint8Array [0..1]) : SqliteDatabase
+    + exec(sql : string) : void
+    + run(sql : string, params : Params = {}) : number
+    + all<T>(sql : string, params : Params = {}) : T [*]
+    + get<T>(sql : string, params : Params = {}) : T [0..1]
+    + insert(sql : string, params : Params = {}) : number
+    + transaction<T>(work : () => T) : T
+    + queryReadOnly(sql : string) : QueryResult [*]
+    + tables() : {name : string, rows : number} [*]
+    + export() : Uint8Array
+    + close() : void
+  }
+
+  class QueryResult <<interface>> {
+    + columns : string [*]
+    + rows : SqlValue [*][*]
+  }
+
+  class SqliteLibraryStore {
+    + db : SqliteDatabase {readOnly}
+    + authors : SqliteAuthorRepository {readOnly}
+    + books : SqliteBookRepository {readOnly}
+    + copies : SqliteCopyRepository {readOnly}
+    + members : SqliteMemberRepository {readOnly}
+    + cards : SqliteCardRepository {readOnly}
+    + loans : SqliteLoanRepository {readOnly}
+    + reservations : SqliteReservationRepository {readOnly}
+    + fines : SqliteFineRepository {readOnly}
+    + policy : SqlitePolicyRepository {readOnly}
+    --
+    + constructor(db : SqliteDatabase)
+    + transaction<T>(work : () => T) : T
+  }
+
+  package "repositories" as dbrepos {
+    class SqliteAuthorRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class SqliteBookRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+      - toBook(row : BookRow) : Book
+    }
+    class SqliteCopyRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class SqliteMemberRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class SqliteCardRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class SqliteLoanRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+      - writeOverrides(loanId : number, codes : ViolationCode [*]) : void
+      - one(sql : string, params) : Loan [0..1]
+      - many(sql : string, params) : Loan [*]
+    }
+    class SqliteReservationRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class SqliteFineRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class SqlitePolicyRepository {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class SqliteGameStore {
+      - db : SqliteDatabase
+      + constructor(db : SqliteDatabase)
+    }
+    class catalogRepo <<utility>> {
+      + {static} likePattern(query : string) : string
+    }
+  }
+
+  class StoredClock {
+    - db : SqliteDatabase {readOnly}
+    --
+    + constructor(db : SqliteDatabase, start : IsoDate)
+    + set(date : IsoDate) : void {redefines}
+    + advance(days : number = 1) : IsoDate {redefines}
+    - persist() : void
+  }
+
+  class schema <<utility>> {
+    - {static} MIGRATIONS : string [4]
+    + {static} SCHEMA_VERSION : number = 4
+    --
+    + {static} migrate(db : SqliteDatabase) : void
+    - {static} seedDefaultPolicy(db : SqliteDatabase) : void
+  }
+
+  class openLibrary <<utility>> {
+    + {static} openLibrary(sql : SqlJsStatic, options : OpenLibraryOptions = {}) : OpenedLibrary
+    + {static} loadSqlJs() : Promise<SqlJsStatic>
+  }
+
+  class OpenLibraryOptions <<interface>> {
+    + clock : Clock [0..1]
+    + startDate : IsoDate [0..1]
+    + bytes : Uint8Array [0..1]
+    + seed : boolean [0..1]
+    + sampleActivityDays : number [0..1]
+  }
+
+  class OpenedLibrary <<interface>> {
+    + library : Library
+    + db : SqliteDatabase
+    + clock : Clock
+  }
+
+  package "seed" {
+    class seeding <<utility>> {
+      - {static} SEED_MEMBERS : [string, MemberType] [22]
+      - {static} SUMMER_SCHOOL_DAYS : number = 12
+      + {static} SEED_BOOKS : SeedBook [46]
+      --
+      + {static} seedIsbn(index : number) : string
+      + {static} seedCatalog(library : Library) : void
+      + {static} emailFor(name : string) : string
+      + {static} seedMembers(library : Library) : void
+      + {static} seedActivity(library : Library, clock : ManualClock, until : IsoDate, random : Random) : void
+    }
+    class SeedBook <<interface>> {
+      + title : string
+      + authors : string [1..*]
+      + year : number [0..1]
+      + genre : Genre
+      + copies : number
+      + referenceOnly : boolean [0..1]
+    }
+  }
+}
+
+package "external: sql.js (SQLite compiled to WebAssembly)" as sqljs {
+  class SqlJsStatic <<external>>
+  class Database <<external>>
+}
+
+package "other sheets" as others {
+  class ManualClock
+  class MemberServiceOptions <<interface>>
+  interface GameStore <<interface>>
+}
+
+' --- The store aggregates the repositories ---
+LibraryStore o-- "1" AuthorRepository
+LibraryStore o-- "1" BookRepository
+LibraryStore o-- "1" CopyRepository
+LibraryStore o-- "1" MemberRepository
+LibraryStore o-- "1" CardRepository
+LibraryStore o-- "1" LoanRepository
+LibraryStore o-- "1" ReservationRepository
+LibraryStore o-- "1" FineRepository
+LibraryStore o-- "1" PolicyRepository
+
+' --- SQLite realises every contract ---
+LibraryStore <|.. SqliteLibraryStore
+AuthorRepository <|.. SqliteAuthorRepository
+BookRepository <|.. SqliteBookRepository
+CopyRepository <|.. SqliteCopyRepository
+MemberRepository <|.. SqliteMemberRepository
+CardRepository <|.. SqliteCardRepository
+LoanRepository <|.. SqliteLoanRepository
+ReservationRepository <|.. SqliteReservationRepository
+FineRepository <|.. SqliteFineRepository
+PolicyRepository <|.. SqlitePolicyRepository
+GameStore <|.. SqliteGameStore
+
+SqliteLibraryStore *-- "1" SqliteAuthorRepository
+SqliteLibraryStore *-- "1" SqliteBookRepository
+SqliteLibraryStore *-- "1" SqliteCopyRepository
+SqliteLibraryStore *-- "1" SqliteMemberRepository
+SqliteLibraryStore *-- "1" SqliteCardRepository
+SqliteLibraryStore *-- "1" SqliteLoanRepository
+SqliteLibraryStore *-- "1" SqliteReservationRepository
+SqliteLibraryStore *-- "1" SqliteFineRepository
+SqliteLibraryStore *-- "1" SqlitePolicyRepository
+SqliteLibraryStore o-- "1" SqliteDatabase
+
+dbrepos ..> SqliteDatabase : SQL
+SqliteDatabase o-- "1" Database
+SqliteDatabase ..> SqlJsStatic : open()
+SqliteDatabase ..> QueryResult
+SqliteDatabase ..> schema : migrate() on open
+ManualClock <|-- StoredClock
+StoredClock --> "1" SqliteDatabase : calendar table
+openLibrary ..> OpenLibraryOptions
+openLibrary ..> OpenedLibrary
+openLibrary ..> SqliteLibraryStore : creates
+openLibrary ..> StoredClock : creates
+openLibrary ..> seeding : sample data
+MemberServiceOptions <|-- OpenLibraryOptions
+seeding ..> SeedBook
+
+note right of SqliteGameStore
+  Each Sqlite*Repository implements every
+  operation of its interface (not repeated here).
+  Rows are mapped to entities by module functions
+  toAuthor / toBook / toCopy / toMember /
+  toCard / toLoan / toReservation / toFine.
+end note
+@enduml

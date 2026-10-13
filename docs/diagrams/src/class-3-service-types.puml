@@ -1,0 +1,146 @@
+@startuml class-3-service-types
+!include style.iuml
+left to right direction
+title Kutup - Class diagram, sheet 3 of 6: data types the services take and return (src/core/services)
+
+package "core.services" {
+
+  package "lending" {
+    class CheckoutRequest <<interface>> {
+      + memberId : number
+      + cardNumber : string
+      + barcode : string
+    }
+
+    class Override <<interface>> {
+      + note : string
+    }
+
+    class Assessment <<interface>> {
+      + violations : Violation [0..*]
+      + allowed : boolean
+      + overridable : boolean
+    }
+
+    class CheckoutAssessment <<interface>> {
+      + member : Member
+      + card : LibraryCard [0..1]
+      + copy : BookCopy
+      + book : Book
+      + dueOn : IsoDate
+    }
+
+    class RenewalAssessment <<interface>> {
+      + loan : Loan
+    }
+
+    class ReturnReceipt <<interface>> {
+      + loan : Loan
+      + copy : BookCopy
+      + book : Book
+      + daysLate : number
+      + fines : Fine [0..*]
+      + heldFor : Reservation [0..1]
+    }
+
+    class OverdueEntry <<interface>> {
+      + loan : Loan
+      + member : Member
+      + copy : BookCopy
+      + book : Book
+      + daysLate : number
+      + accruedFine : number
+    }
+  }
+
+  package "members" {
+    class RegisterInput <<interface>> {
+      + name : string
+      + type : MemberType
+      + email : string [0..1] {optional}
+    }
+
+    class MemberServiceOptions <<interface>> {
+      + random : () => number [0..1] {optional}
+    }
+
+    class LoanDetails <<interface>> {
+      + loan : Loan
+      + copy : BookCopy
+      + book : Book
+    }
+
+    class AccountSummary <<interface>> {
+      + member : Member
+      + card : LibraryCard [0..1]
+      + activeLoans : LoanDetails [0..*]
+      + overdueLoans : LoanDetails [0..*]
+      + reservations : Reservation [0..*]
+      + outstandingFines : Fine [0..*]
+      + balance : number
+    }
+  }
+
+  package "catalog" {
+    class NewBookInput <<interface>> {
+      + isbn : string
+      + title : string
+      + authors : string [1..*]
+      + publishedYear : number [0..1] {optional}
+      + genre : Genre
+      + referenceOnly : boolean [0..1] {optional}
+    }
+
+    class Availability <<interface>> {
+      + total : number
+      + onShelf : number
+      + onLoan : number
+      + onHold : number
+      + outOfService : number
+    }
+  }
+
+  package "reports" {
+    class LibrarySnapshot <<interface>> {
+      + titles : number
+      + copies : Record<CopyStatus, number>
+      + totalCopies : number
+      + members : number
+      + activeLoans : number
+      + overdueLoans : number
+      + holdsReady : number
+      + reservationsWaiting : number
+      + outstandingFines : number
+    }
+  }
+
+  class LendingService
+  class MemberService
+  class CatalogService
+  class ReportService
+}
+
+Assessment <|-- CheckoutAssessment
+Assessment <|-- RenewalAssessment
+AccountSummary *-- "0..*" LoanDetails
+
+LendingService ..> CheckoutRequest : takes
+LendingService ..> Override : takes
+LendingService ..> CheckoutAssessment : checkCheckout()
+LendingService ..> RenewalAssessment : checkRenewal()
+LendingService ..> ReturnReceipt : returnCopy()
+LendingService ..> OverdueEntry : overdue()
+MemberService ..> RegisterInput : register()
+MemberService ..> MemberServiceOptions : constructor
+MemberService ..> AccountSummary : summary()
+MemberService ..> LoanDetails : loanHistory()
+CatalogService ..> NewBookInput : addBook()
+CatalogService ..> Availability : availability()
+ReportService ..> LibrarySnapshot : snapshot()
+
+note bottom of Assessment
+  allowed = no violations.
+  overridable = every violation can be
+  overridden by a librarian (with a note).
+end note
+@enduml

@@ -1,0 +1,268 @@
+@startuml class-2-services
+!include style.iuml
+title Kutup - Class diagram, sheet 2 of 6: services, facade, clock and errors (src/core)
+
+package "core" {
+
+  class Library {
+    + store : LibraryStore {readOnly}
+    + clock : Clock {readOnly}
+    + catalog : CatalogService {readOnly}
+    + members : MemberService {readOnly}
+    + lending : LendingService {readOnly}
+    + reservations : ReservationService {readOnly}
+    + fines : FineService {readOnly}
+    + reports : ReportService {readOnly}
+    --
+    + constructor(store : LibraryStore, clock : Clock, options : MemberServiceOptions)
+    + «get» policy() : LendingPolicy
+    + «set» policy(policy : LendingPolicy)
+    + openForTheDay() : void
+  }
+
+  package "services" {
+
+    class CatalogService {
+      - store : LibraryStore {readOnly}
+      - clock : Clock {readOnly}
+      - reservations : ReservationService {readOnly}
+      --
+      + constructor(store : LibraryStore, clock : Clock, reservations : ReservationService)
+      + findOrAddAuthor(name : string, birthYear : number [0..1] = null) : Author
+      + addBook(input : NewBookInput) : Book
+      + addCopies(bookId : number, count : number = 1, condition : CopyCondition = good) : BookCopy [*]
+      + {static} barcodeFor(bookId : number, copyNumber : number) : string
+      + getBook(id : number) : Book
+      + getCopy(barcode : string) : BookCopy
+      + copiesOf(bookId : number) : BookCopy [*]
+      + search(query : string) : Book [*]
+      + availability(bookId : number) : Availability
+      + updateBook(bookId : number, changes : {title, genre, referenceOnly}) : Book
+      + sendToRepair(barcode : string) : BookCopy
+      + restoreToShelf(barcode : string) : BookCopy
+      + withdraw(barcode : string) : BookCopy
+      - changeCopy(barcode : string, change : (BookCopy) => void) : BookCopy
+    }
+
+    class MemberService {
+      - store : LibraryStore {readOnly}
+      - clock : Clock {readOnly}
+      - fines : FineService {readOnly}
+      - random : () => number {readOnly}
+      --
+      + constructor(store : LibraryStore, clock : Clock, fines : FineService, options : MemberServiceOptions)
+      + register(input : RegisterInput) : {member : Member, card : LibraryCard}
+      + issueCard(memberId : number) : LibraryCard
+      + reportCardLost(memberId : number) : LibraryCard
+      + renewCard(memberId : number) : LibraryCard
+      + suspend(memberId : number) : Member
+      + reinstate(memberId : number) : Member
+      + update(memberId : number, changes : {name, type, email}) : Member
+      + get(memberId : number) : Member
+      + search(query : string) : Member [*]
+      + findByCardNumber(number : string) : {member : Member, card : LibraryCard} [0..1]
+      + summary(memberId : number) : AccountSummary
+      + loanHistory(memberId : number) : LoanDetails [*]
+      - details(loan : Loan) : LoanDetails
+      - cardValidityDays(member : Member) : number
+      - unusedCardNumber() : string
+      - change(memberId : number, change : (Member) => void) : Member
+    }
+
+    class LendingService {
+      - store : LibraryStore {readOnly}
+      - clock : Clock {readOnly}
+      - fines : FineService {readOnly}
+      - reservations : ReservationService {readOnly}
+      --
+      + constructor(store : LibraryStore, clock : Clock, fines : FineService, reservations : ReservationService)
+      + checkCheckout(request : CheckoutRequest) : CheckoutAssessment
+      + checkout(request : CheckoutRequest, override : Override [0..1]) : Loan
+      + checkRenewal(loanId : number) : RenewalAssessment
+      + renew(loanId : number, override : Override [0..1]) : Loan
+      + returnCopy(barcode : string, condition : CopyCondition = good) : ReturnReceipt
+      + declareLost(loanId : number) : Fine [*]
+      + overdue() : OverdueEntry [*]
+      + getLoan(loanId : number) : Loan
+      - validateOverride(check : Assessment, override : Override [0..1]) : string [0..1]
+    }
+
+    class ReservationService {
+      - store : LibraryStore {readOnly}
+      - clock : Clock {readOnly}
+      --
+      + constructor(store : LibraryStore, clock : Clock)
+      + check(memberId : number, bookId : number) : Violation [*]
+      + reserve(memberId : number, bookId : number) : Reservation
+      + cancel(reservationId : number) : Reservation
+      + queuePosition(reservationId : number) : number
+      + allocate(copy : BookCopy) : Reservation [0..1]
+      + expireHolds() : Reservation [*]
+      + get(reservationId : number) : Reservation
+      - passOnHeldCopy(copy : BookCopy) : void
+    }
+
+    class FineService {
+      - store : LibraryStore {readOnly}
+      - clock : Clock {readOnly}
+      --
+      + constructor(store : LibraryStore, clock : Clock)
+      + {static} overdueAmount(loan : Loan, returnedOn : IsoDate, policy : LendingPolicy) : number
+      + chargeOverdue(loan : Loan) : Fine [0..1]
+      + charge(memberId : number, amount : number, reason : FineReason, loanId : number [0..1] = null) : Fine
+      + balance(memberId : number) : number
+      + accruingBalance(memberId : number) : number
+      + pay(fineId : number) : Fine
+      + waive(fineId : number) : Fine
+      + payAll(memberId : number) : number
+      - settle(fineId : number, change : (Fine) => void) : Fine
+    }
+
+    class ReportService {
+      - store : LibraryStore {readOnly}
+      - clock : Clock {readOnly}
+      --
+      + constructor(store : LibraryStore, clock : Clock)
+      + snapshot() : LibrarySnapshot
+      + mostBorrowed(limit : number = 5) : {book : Book, loans : number} [*]
+    }
+
+    class support <<utility>> {
+      + {static} found<T>(value : T [0..1], entity : string, key : string | number) : T
+      + {static} requireText(value : string, field : string) : string
+    }
+  }
+
+  interface Clock <<interface>> {
+    + today() : IsoDate
+  }
+
+  class SystemClock {
+    + today() : IsoDate
+  }
+
+  class ManualClock {
+    - current : IsoDate
+    --
+    + constructor(start : IsoDate)
+    + today() : IsoDate
+    + set(date : IsoDate) : void
+    + advance(days : number = 1) : IsoDate
+  }
+
+  class Random {
+    - state : number
+    --
+    + constructor(seed : number)
+    + next() : number
+    + int(min : number, max : number) : number
+    + chance(probability : number) : boolean
+    + pick<T>(items : T [*]) : T
+    + shuffle<T>(items : T [*]) : T [*]
+    + asFunction() : () => number
+  }
+
+  class dates <<utility>> {
+    + {static} isIsoDate(value : string) : boolean
+    + {static} assertIsoDate(value : string) : IsoDate
+    + {static} toIsoDate(date : Date) : IsoDate
+    + {static} addDays(date : IsoDate, days : number) : IsoDate
+    + {static} daysBetween(from : IsoDate, to : IsoDate) : number
+    + {static} isBefore(a : IsoDate, b : IsoDate) : boolean
+    + {static} isAfter(a : IsoDate, b : IsoDate) : boolean
+  }
+
+  class identifiers <<utility>> {
+    + {static} CARD_NUMBER_LENGTH : number = 8
+    --
+    + {static} normalizeIsbn(raw : string) : string
+    + {static} isbn13CheckDigit(first12 : string) : number
+    + {static} isValidIsbn13(raw : string) : boolean
+    + {static} luhnCheckDigit(payload : string) : number
+    + {static} isValidCardNumber(number : string) : boolean
+    + {static} generateCardNumber(random : () => number) : string
+    + {static} formatCardNumber(number : string) : string
+  }
+
+  package "errors" {
+    class Error <<built-in>>
+
+    class LibraryError {
+      + constructor(message : string)
+    }
+
+    class NotFoundError {
+      + entity : string {readOnly}
+      + key : string | number {readOnly}
+      --
+      + constructor(entity : string, key : string | number)
+    }
+
+    class ValidationError
+    class InvalidStateError
+
+    class PolicyViolationError {
+      + violations : Violation [1..*] {readOnly}
+      --
+      + constructor(violations : Violation [1..*])
+    }
+  }
+
+  interface LibraryStore <<interface>> {
+    (see sheet 4)
+  }
+
+  package "model (see sheet 1)" as modelRef {
+    class LendingPolicy
+    class Violation <<interface>>
+  }
+}
+
+' --- The facade owns the services ---
+Library *-- "1" CatalogService
+Library *-- "1" MemberService
+Library *-- "1" LendingService
+Library *-- "1" ReservationService
+Library *-- "1" FineService
+Library *-- "1" ReportService
+Library o-- "1" LibraryStore : store
+Library o-- "1" Clock : clock
+Library ..> LendingPolicy : reads / writes\nvia store.policy
+
+' --- Collaborations between services ---
+CatalogService --> "1" ReservationService : allocates returned copies
+MemberService --> "1" FineService : balances
+LendingService --> "1" FineService : charges fines
+LendingService --> "1" ReservationService : holds & queues
+
+' --- Every service uses the store and the clock ---
+CatalogService ..> LibraryStore
+MemberService ..> LibraryStore
+LendingService ..> LibraryStore
+ReservationService ..> LibraryStore
+FineService ..> LibraryStore
+ReportService ..> LibraryStore
+CatalogService ..> identifiers : ISBN check
+MemberService ..> identifiers : card numbers
+LendingService ..> PolicyViolationError : throws
+ReservationService ..> PolicyViolationError : throws
+
+note "Every service also uses Clock (today()),\nsupport (found, requireText) and dates." as NS
+
+' --- Layout: helpers and errors below the services ---
+ReportService -[hidden]down- dates
+ReservationService -[hidden]down- errors
+FineService -[hidden]down- Random
+
+' --- Clocks ---
+Clock <|.. SystemClock
+Clock <|.. ManualClock
+
+' --- Errors ---
+Error <|-- LibraryError
+LibraryError <|-- NotFoundError
+LibraryError <|-- ValidationError
+LibraryError <|-- InvalidStateError
+LibraryError <|-- PolicyViolationError
+PolicyViolationError o-- "1..*" Violation
+@enduml

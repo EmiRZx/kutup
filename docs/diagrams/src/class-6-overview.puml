@@ -1,0 +1,200 @@
+@startuml class-6-overview
+!include style.iuml
+title Kutup - Class diagram, sheet 6 of 6: packages, their dependencies, and the user interface (src/ui)
+
+package "ui (React 19 function components)" as ui {
+
+  package "state" {
+    class Session <<interface>> {
+      + library : Library
+      + db : SqliteDatabase
+      + clock : ManualClock
+      + revision : number
+      + toasts : Toast [*]
+      --
+      + act<T>(change : () => T, success : string [0..1]) : T [0..1]
+      + notify(tone : Tone, title : string, lines : string [*]) : void
+      + replace(bytes : Uint8Array | 'sample', prepare : (Opened) => void [0..1]) : boolean
+      + dismiss(id : number) : void
+    }
+    class Opened <<interface>> {
+      + library : Library
+      + db : SqliteDatabase
+      + clock : ManualClock
+    }
+    class Toast <<interface>> {
+      + id : number
+      + tone : Tone
+      + title : string
+      + lines : string [*]
+    }
+    enum Tone <<enumeration>> {
+      ok
+      danger
+      info
+    }
+    class session <<utility>> {
+      + {static} SessionProvider(children) : Element
+      + {static} useSession() : Session
+      + {static} bootLibrary(sql : SqlJsStatic) : Promise<{opened, restored, warning}>
+      + {static} describeError(error : unknown) : {title, lines}
+    }
+    class persistence <<utility>> {
+      + {static} loadSavedLibrary() : Promise<Uint8Array [0..1]>
+      + {static} saveLibrary(bytes : Uint8Array) : Promise<boolean>
+      + {static} forgetSavedLibrary() : Promise<void>
+      + {static} downloadFile(bytes : Uint8Array, filename : string) : void
+    }
+    class router <<utility>> {
+      + {static} useRoute() : Route
+      + {static} href(path : string) : string
+      + {static} navigate(path : string) : void
+      + {static} Link(to : string, children) : Element
+    }
+  }
+
+  class format <<utility>> {
+    + {static} COPY_STATUS, RESERVATION_STATUS, FINE_STATUS : Map<status, {label, tone : BadgeTone}>
+    + {static} FINE_REASON, MEMBER_TYPE : Map<value, string>
+    --
+    + {static} formatMoney(cents : number) : string
+    + {static} parseMoney(input : string) : number [0..1]
+    + {static} formatDate(date : IsoDate [0..1]) : string
+    + {static} formatLongDate(date : IsoDate) : string
+    + {static} relativeDays(date : IsoDate, today : IsoDate) : string
+    + {static} formatIsbn(isbn : string) : string
+    + {static} plural(n : number, word : string, many : string = word + "s") : string
+  }
+
+  class App <<component>>
+  class Home <<component>>
+
+  package "admin (back office)" as admin {
+    class AdminLayout <<component>>
+    class DashboardPage <<component>>
+    class CirculationPage <<component>>
+    class CatalogPage <<component>>
+    class BookPage <<component>>
+    class MembersPage <<component>>
+    class MemberPage <<component>>
+    class ReservationsPage <<component>>
+    class PolicyPage <<component>>
+    class DatabasePage <<component>>
+    class pickers <<component>> {
+      BookSelect
+      MemberSelect
+    }
+  }
+
+  package "game (desk screens)" as gameui {
+    class GameRoute <<component>>
+    class DeskScene <<component>>
+    class Terminal <<component>>
+    class Portrait <<component>>
+    class DeskItems <<component>> {
+      CardOnDesk
+      BookOnDesk
+      Stamp
+      WallClock
+      WallCalendar
+    }
+    class Paperwork <<component>> {
+      Bulletin
+      Ledger
+      Review
+      NewCareer
+    }
+  }
+
+  package "components" {
+    class ui_kit <<component>> {
+      Button, Badge, Panel, Field, Empty, Notice,
+      ViolationList, PageHeader, Toasts, Stat
+    }
+  }
+}
+
+package "game (sheet 5)" as game {
+  class Game
+}
+
+package "sim (sheet 5)" as sim {
+  class life <<utility>>
+}
+
+package "core (sheets 1-3)" as core {
+  class Library
+  interface LibraryStore <<interface>>
+  interface Clock <<interface>>
+}
+
+package "db (sheet 4)" as db {
+  class SqliteDatabase
+  class SqliteLibraryStore
+  class StoredClock
+  class SqliteGameStore
+}
+
+' --- Package dependencies (core depends on nothing) ---
+ui ..> game
+ui ..> core
+ui ..> db
+game ..> core
+game ..> sim : overnight
+sim ..> core
+db ..> core : implements contracts
+db ..> game : implements GameStore
+db ..> sim : sample history
+
+' --- Inside the UI ---
+Session --|> Opened
+Session *-- "0..*" Toast
+Toast --> Tone
+session ..> Session : provides
+session ..> persistence : autosave
+App ..> session
+App ..> router
+App ..> Home
+App ..> AdminLayout
+App ..> GameRoute
+App ..> DashboardPage
+App ..> CirculationPage
+App ..> CatalogPage
+App ..> BookPage
+App ..> MembersPage
+App ..> MemberPage
+App ..> ReservationsPage
+App ..> PolicyPage
+App ..> DatabasePage
+CirculationPage ..> pickers
+BookPage ..> pickers
+ReservationsPage ..> pickers
+GameRoute ..> Paperwork
+GameRoute ..> DeskScene
+DeskScene ..> Terminal
+DeskScene ..> Portrait
+DeskScene ..> DeskItems
+DeskItems ..> Portrait
+admin ..> components
+admin ..> format
+gameui ..> format
+gameui ..> components
+
+GameRoute --> "0..1" Game
+Session --> "1" Library
+Session --> "1" SqliteDatabase
+LibraryStore <|.. SqliteLibraryStore
+Clock <|.. StoredClock
+Library o-- LibraryStore
+Library o-- Clock
+
+note right of App
+  Hash routes:
+  ~#/          -> Home
+  ~#/desk      -> GameRoute
+  ~#/admin/... -> a page inside AdminLayout
+  (dashboard, circulation, catalog,
+   catalog/:id, members, members/:id,
+   reservations, policy, database)
+end note
+@enduml

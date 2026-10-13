@@ -1,0 +1,423 @@
+@startuml class-5-game
+!include style.iuml
+title Kutup - Class diagram, sheet 5 of 6: the desk game (src/game) and background life (src/sim)
+
+package "game" {
+
+  class Game {
+    + library : Library {readOnly}
+    - store : GameStore {readOnly}
+    - clock : ManualClock {readOnly}
+    - current : CareerState
+    --
+    - constructor(library : Library, store : GameStore, clock : ManualClock, state : CareerState)
+    + {static} resume(library : Library, store : GameStore, clock : ManualClock) : Game [0..1]
+    + {static} start(library : Library, store : GameStore, clock : ManualClock, seed : number) : Game
+    + «get» state() : CareerState
+    + «get» plan() : DayPlan
+    + «get» known() : Set<ViolationCode>
+    + «get» isLastCampaignDay() : boolean
+    + todaysRecords() : EncounterRecord [*]
+    + history() : {days : DayRecord [*], encounters : EncounterRecord [*]}
+    + deck() : ScenarioKind [*]
+    + waiting() : number
+    + openDesk() : void
+    + nextEncounter(minutes : number) : Encounter [0..1]
+    + decide(encounter : Encounter, decision : Decision, minutes : number) : Verdict
+    + closeDay() : DayRecord
+    + goHome() : void
+    - prepareMorning() : void
+    - suspended() : Member [*]
+    - suspendWorstDebtors() : void
+    - stockHoldShelf(target : number) : void
+    - expect(status : CareerStatus) : void
+    - update(changes : Partial<CareerState>) : void
+  }
+
+  class GameModule <<utility>> {
+    + {static} CLOSING_MINUTES : number = 480
+    --
+    - {static} mix(seed : number, day : number, slot : number) : number
+  }
+
+  interface GameStore <<interface>> {
+    + load() : CareerState [0..1]
+    + save(state : CareerState) : void
+    + addEncounter(record : EncounterRecord) : void
+    + encounters(day : number) : EncounterRecord [*]
+    + allEncounters() : EncounterRecord [*]
+    + addDay(record : DayRecord) : void
+    + days() : DayRecord [*]
+    + clear() : void
+  }
+
+  class CareerState <<interface>> {
+    + day : number
+    + savings : number
+    + status : CareerStatus
+    + seed : number
+    + minutes : number
+    + bulletin : Bulletin
+    + endless : boolean
+  }
+
+  class Bulletin <<interface>> {
+    + headline : string
+    + newRules : ViolationCode [*]
+    + notices : string [*]
+    + suspended : string [*]
+  }
+
+  class Encounter <<interface>> {
+    + day : number
+    + index : number
+    + kind : ScenarioKind
+    + request : RequestType
+    + patron : {memberId : number, name : string}
+    + card : DeskCard [0..1]
+    + book : DeskBook
+    + loanId : number [0..1]
+    + greeting : string
+  }
+
+  class DeskCard <<interface>> {
+    + number : string
+    + name : string
+    + memberType : MemberType
+    + expiresOn : IsoDate
+    + photoSeed : number
+  }
+
+  class DeskBook <<interface>> {
+    + barcode : string
+    + title : string
+    + author : string
+    + referenceOnly : boolean
+    + holdSlip : string [0..1]
+    + damaged : boolean
+    + coverSeed : number
+  }
+
+  abstract class Decision <<union>> {
+    + type : 'approve' | 'deny' | 'check-in'
+  }
+  class Approve {
+    + type = 'approve'
+  }
+  class Deny {
+    + type = 'deny'
+    + reason : ViolationCode
+  }
+  class CheckIn {
+    + type = 'check-in'
+    + condition : 'good' | 'damaged'
+  }
+
+  class Verdict <<interface>> {
+    + correct : boolean
+    + citation : string [0..1]
+    + warning : string [0..1]
+    + truth : Violation [*]
+    + reply : string
+    + mood : Mood
+  }
+
+  class EncounterRecord <<interface>> {
+    + day : number
+    + index : number
+    + kind : ScenarioKind
+    + request : RequestType
+    + memberId : number
+    + barcode : string
+    + cardNumber : string [0..1]
+    + decision : 'approve' | 'deny' | 'check-in'
+    + reason : string [0..1]
+    + correct : boolean
+    + citation : string [0..1]
+    + warning : string [0..1]
+  }
+
+  class DayRecord <<interface>> {
+    + day : number
+    + date : IsoDate
+    + served : number
+    + correct : number
+    + citations : number
+    + wages : number
+    + penalties : number
+    + expenses : number
+    + savingsAfter : number
+  }
+
+  class DayPlan <<interface>> {
+    + day : number
+    + headline : string
+    + introduces : ScenarioKind [*]
+    + patrons : number
+    + notices : string [*]
+    + policy : (LendingPolicy) => LendingPolicy [0..1]
+  }
+
+  class ScenarioContext <<interface>> {
+    + library : Library
+    + random : Random
+    + day : number
+    + index : number
+    + known : Set<ViolationCode>
+    + seen : Set<number>
+  }
+
+  class campaign <<utility>> {
+    + {static} TARGET : Map<ScenarioKind, ViolationCode>
+    + {static} REQUEST_OF : Map<ScenarioKind, RequestType>
+    + {static} DENIAL_REASONS : Map<RequestType, ViolationCode [*]>
+    - {static} CAMPAIGN : DayPlan [7]
+    + {static} CAMPAIGN_DAYS : number = 7
+    - {static} HONEST : Set<ScenarioKind>
+    - {static} HONEST_WEIGHT : Map<ScenarioKind, number>
+    --
+    + {static} planFor(day : number) : DayPlan
+    + {static} kindsUpTo(day : number) : ScenarioKind [*]
+    + {static} knownRules(day : number) : Set<ViolationCode>
+    + {static} isHonest(kind : ScenarioKind) : boolean
+    + {static} troubleShare(day : number) : number
+    + {static} deckFor(day : number, pick, shuffle) : ScenarioKind [*]
+  }
+
+  class scenarios <<utility>> {
+    - {static} ATTEMPTS : number = 25
+    - {static} BUILDERS : Map<ScenarioKind, Builder>
+    + {static} FALLBACKS : ScenarioKind [4]
+    --
+    + {static} buildEncounter(kind : ScenarioKind, ctx : ScenarioContext) : Encounter [0..1]
+    - {static} deskCard(card : LibraryCard, holder : Member) : DeskCard
+    - {static} deskBook(library : Library, copy : BookCopy, extra) : DeskBook
+    - {static} encounter(ctx, kind, member, card, book, loanId, says) : Encounter
+    - {static} candidates(ctx, filter) : Member [*]
+    - {static} shelfCopies(ctx, filter) : BookCopy [*]
+    - {static} lendable(book : Book) : boolean
+    - {static} borrowViolations(ctx, member, cardNumber, copy) : Violation [*]
+    - {static} fair(violations, target, known) : boolean
+    - {static} usableCard(ctx, member) : LibraryCard [0..1]
+    - {static} cleanBorrower(ctx, copy, exclude, cardFilter) : {member, card} [0..1]
+    - {static} withShelfCopy(ctx, filter, make) : Encounter [0..1]
+    - {static} lendUpTo(ctx, member, card, count, keep) : boolean
+    - {static} accountProblem(kind, target, eligible) : Builder
+    - {static} activeLoans(ctx, filter) : {loan, member} [*]
+    - {static} returnBuilder(kind) : Builder
+    - {static} renewBuilder(kind, target, prepare) : Builder
+  }
+
+  class judge <<utility>> {
+    + {static} CITATIONS : Map<ViolationCode, string>
+    + {static} RULE_NAMES : Map<ViolationCode, string>
+    --
+    + {static} judge(library : Library, encounter : Encounter, decision : Decision, random : Random) : Verdict
+    + {static} ruleText(code : ViolationCode) : string
+    - {static} judgeRequest(encounter, decision, random, request) : Verdict
+    - {static} judgeReturn(library, encounter, decision, random) : Verdict
+    - {static} ruleName(code : ViolationCode) : string
+  }
+
+  class economy <<utility>> {
+    + {static} ECONOMY.startingSavings : number = 2000
+    + {static} ECONOMY.wagePerPatron : number = 300
+    + {static} ECONOMY.freeCitationsPerDay : number = 1
+    + {static} ECONOMY.citationPenalty : number = 500
+    + {static} ECONOMY.expenses : {label, amount, from} [4]
+    + {static} ECONOMY.firedBelow : number = -2500
+    --
+    + {static} expensesFor(day : number) : {label, amount} [*]
+    + {static} ledgerFor(records : EncounterRecord [*], day : number) : DayLedger
+    + {static} reviewFor(records : EncounterRecord [*]) : Review
+  }
+
+  class DayLedger <<interface>> {
+    + served : number
+    + correct : number
+    + citations : number
+    + wages : number
+    + penalties : number
+    + expenses : number
+    + net : number
+  }
+
+  class Review <<interface>> {
+    + accuracy : number
+    + title : string
+    + remark : string
+  }
+
+  class terminal <<utility>> {
+    + {static} QUERY_MINUTES : number = 4
+    --
+    + {static} lookup(library : Library, rawQuery : string) : TerminalLine [*]
+    + {static} terminalDate(date : IsoDate) : string
+    - {static} lookupCard(library, number) : TerminalLine [*]
+    - {static} lookupCopy(library, barcode) : TerminalLine [*]
+  }
+
+  class TerminalLine <<interface>> {
+    + text : string
+    + tone : 'alert' | 'dim' [0..1]
+  }
+
+  class rulebook <<utility>> {
+    + {static} rulePages(known : Set<ViolationCode>, policy : LendingPolicy) : RulePage [*]
+  }
+
+  class RulePage <<interface>> {
+    + code : ViolationCode
+    + name : string
+    + how : string
+    + where : 'card' | 'book' | 'terminal' | 'noticeboard'
+  }
+
+  class dialogue <<utility>> {
+    - {static} GREETINGS : Map<ScenarioKind, string [*]>
+    - {static} CAUGHT : Map<ViolationCode, string [*]>
+    - {static} THANKS, WRONGED, DAMAGE_DENIAL, RETURN_THANKS : string [*]
+    --
+    + {static} greetingFor(kind : ScenarioKind, name : string, random : Random) : string
+    + {static} replyFor(random : Random, outcome, reason : ViolationCode [0..1]) : {reply, mood}
+    - {static} firstName(name : string) : string
+  }
+
+  class faces <<utility>> {
+    + {static} SKIN_TONES = 6
+    + {static} HAIR_COLOURS = 8
+    + {static} SHIRT_COLOURS = 8
+    --
+    + {static} faceFor(seed : number) : Face
+    + {static} visibleDifferences(a : Face, b : Face) : number
+  }
+
+  class Face <<interface>> {
+    + skin : number
+    + hair : number
+    + shirt : number
+    + hairStyle : number
+    + faceWidth : number
+    + faceHeight : number
+    + glasses : boolean
+    + beard : boolean
+    + eyeGap : number
+  }
+
+  class types <<utility>> {
+    + {static} SCENARIO_KINDS : ScenarioKind [22]
+  }
+
+  package "enumerations" as genums {
+    enum RequestType <<enumeration>> {
+      borrow
+      return
+      renew
+    }
+    enum CareerStatus <<enumeration>> {
+      morning
+      open
+      evening
+      review
+      fired
+    }
+    enum Mood <<enumeration>> {
+      happy
+      neutral
+      annoyed
+      angry
+    }
+    enum ScenarioKind <<enumeration>> {
+      valid-borrow
+      hold-pickup
+      card-expiring
+      near-fine-limit
+      near-loan-limit
+      expired-card
+      someone-elses-card
+      forged-card
+      lost-card
+      suspended
+      loan-limit
+      overdue
+      fines
+      reference
+      held-for-another
+      return-good
+      return-damaged
+      valid-renew
+      last-renewal
+      renew-limit
+      renew-overdue
+      renew-waiting
+    }
+  }
+}
+
+package "sim" {
+  class life <<utility>> {
+    + {static} isTardy(memberId : number) : boolean
+    + {static} randomName(random : Random) : string
+    + {static} simulateDay(library : Library, random : Random) : void
+    - {static} register(library : Library, random : Random, type : MemberType) : void
+  }
+  class names <<utility>> {
+    + {static} FIRST_NAMES : string [*]
+    + {static} LAST_NAMES : string [*]
+  }
+}
+
+package "core (sheets 1-2)" as coreRef {
+  class Library
+  class ManualClock
+  class Random
+}
+
+' --- The career ---
+Game --> "1" Library : library
+Game --> "1" GameStore : store
+Game --> "1" ManualClock : clock
+Game *-- "1" CareerState : current
+CareerState *-- "1" Bulletin
+Game ..> GameModule
+Game ..> campaign : today's plan & deck
+Game ..> scenarios : builds patrons
+Game ..> judge : grades decisions
+Game ..> economy : evening ledger
+Game ..> life : overnight
+Game ..> Encounter : creates
+Game ..> Verdict : returns
+Game ..> EncounterRecord : records
+Game ..> DayRecord : records
+GameStore ..> CareerState
+GameStore ..> EncounterRecord
+GameStore ..> DayRecord
+
+' --- One patron at the desk ---
+Encounter *-- "0..1" DeskCard : card
+Encounter *-- "1" DeskBook : book
+Decision <|-- Approve
+Decision <|-- Deny
+Decision <|-- CheckIn
+judge ..> Decision
+judge ..> Verdict : creates
+judge ..> Library : carries out via services
+judge ..> dialogue : replies
+Game ..> Random : seeded per day / patron
+terminal ..> Library : reads records
+
+scenarios ..> ScenarioContext
+scenarios ..> Encounter : creates
+scenarios ..> faces : look-alikes
+scenarios ..> dialogue : greeting
+campaign ..> DayPlan
+economy ..> DayLedger
+economy ..> Review
+terminal ..> TerminalLine
+rulebook ..> RulePage
+faces ..> Face
+life ..> names
+life ..> Library : public services only
+ScenarioContext --> "1" Library
+ScenarioContext --> "1" Random
+@enduml

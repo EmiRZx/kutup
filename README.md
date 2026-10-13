@@ -78,6 +78,10 @@ The library is saved in the browser automatically, and can be downloaded as (or 
   <img src="docs/screenshots/database.png" width="49%" alt="The database page with a read-only SQL console">
 </p>
 
+## Design documents
+
+UML [class, object and deployment diagrams](docs/diagrams) drawn from the code, as PlantUML sources and rendered SVG/PNG.
+
 ## Built with
 
 TypeScript (strict), React 19 and Vite; SQLite compiled to WebAssembly ([sql.js](https://sql.js.org)) for the
@@ -132,3 +136,7 @@ npm run build
 npm run e2e          # end-to-end checks in headless Chrome
 npm run screenshots  # capture every screen into ./screenshots
 ```
+
+## License
+
+[MIT](LICENSE)
