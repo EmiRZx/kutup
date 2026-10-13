@@ -4,12 +4,15 @@ import type { EncounterRecord } from './types';
 export const ECONOMY = {
   startingSavings: 2000,
   wagePerPatron: 300,
-  /** The first citations each day are just warnings. */
-  freeCitationsPerDay: 2,
+  /** The first citation each day is just a warning. */
+  freeCitationsPerDay: 1,
   citationPenalty: 500,
+  /** The bills, and the day each one starts arriving. */
   expenses: [
-    { label: 'Rent', amount: 1000 },
-    { label: 'Lunch and bus fare', amount: 400 },
+    { label: 'Rent', amount: 1400, from: 1 },
+    { label: 'Lunch and bus fare', amount: 500, from: 1 },
+    { label: 'Heating', amount: 400, from: 3 },
+    { label: 'Night-school fees', amount: 600, from: 5 },
   ],
   /** Sink below this and the director lets you go. */
   firedBelow: -2500,
@@ -25,12 +28,17 @@ export interface DayLedger {
   net: number;
 }
 
-export function ledgerFor(records: readonly EncounterRecord[]): DayLedger {
+/** Tonight's bills. */
+export function expensesFor(day: number): { label: string; amount: number }[] {
+  return ECONOMY.expenses.filter((e) => day >= e.from);
+}
+
+export function ledgerFor(records: readonly EncounterRecord[], day: number): DayLedger {
   const correct = records.filter((r) => r.correct).length;
   const citations = records.filter((r) => r.citation).length;
   const wages = correct * ECONOMY.wagePerPatron;
   const penalties = Math.max(0, citations - ECONOMY.freeCitationsPerDay) * ECONOMY.citationPenalty;
-  const expenses = ECONOMY.expenses.reduce((sum, e) => sum + e.amount, 0);
+  const expenses = expensesFor(day).reduce((sum, e) => sum + e.amount, 0);
   return { served: records.length, correct, citations, wages, penalties, expenses, net: wages - penalties - expenses };
 }
 

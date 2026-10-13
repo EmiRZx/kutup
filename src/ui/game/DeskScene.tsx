@@ -5,7 +5,7 @@ import { ECONOMY } from '../../game/economy';
 import { CLOSING_MINUTES, type Game } from '../../game/Game';
 import { RULE_NAMES } from '../../game/judge';
 import { rulePages } from '../../game/rulebook';
-import { lookup } from '../../game/terminal';
+import { lookup, QUERY_MINUTES } from '../../game/terminal';
 import type { Decision, Encounter, Verdict } from '../../game/types';
 import { formatMoney } from '../format';
 import { useSession } from '../state/session';
@@ -83,7 +83,10 @@ export function DeskScene({ game }: { game: Game }) {
     }
   };
 
-  const scan = (query: string) => setTerminal((t) => [...t.slice(-6), { query: query.toUpperCase(), lines: lookup(library, query) }]);
+  const scan = (query: string) => {
+    setTerminal((t) => [...t.slice(-6), { query: query.toUpperCase(), lines: lookup(library, query) }]);
+    if (!paused && !closed) setMinutes((m) => Math.min(m + QUERY_MINUTES, CLOSING_MINUTES));
+  };
 
   const today = library.clock.today();
   const records = game.todaysRecords();
@@ -107,7 +110,7 @@ export function DeskScene({ game }: { game: Game }) {
         <div className="booth__window">
           {encounter && !closed ? (
             <div className={`patron${verdict ? ' patron--done' : ''}`} key={`${encounter.day}-${encounter.index}`}>
-              <Portrait seed={encounter.patron.memberId} mood={verdict?.mood ?? 'neutral'} size={210} title={encounter.patron.name} />
+              <Portrait seed={encounter.patron.memberId} mood={verdict?.mood ?? 'neutral'} size={210} title="The patron at the desk" />
               <div className="speech">
                 <p>{verdict ? verdict.reply : encounter.greeting}</p>
                 <span className="speech__request">

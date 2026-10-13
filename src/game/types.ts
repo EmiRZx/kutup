@@ -9,6 +9,10 @@ export const SCENARIO_KINDS = [
   // Borrowing, all in order
   'valid-borrow',
   'hold-pickup',
+  // Borrowing, all in order, but close enough to a line to make you look twice
+  'card-expiring',
+  'near-fine-limit',
+  'near-loan-limit',
   // Borrowing, with something wrong
   'expired-card',
   'someone-elses-card',
@@ -25,6 +29,7 @@ export const SCENARIO_KINDS = [
   'return-damaged',
   // Renewals
   'valid-renew',
+  'last-renewal',
   'renew-limit',
   'renew-overdue',
   'renew-waiting',

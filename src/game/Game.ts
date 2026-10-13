@@ -156,7 +156,7 @@ export class Game {
   /** Closes the desk and settles the day's accounts. */
   closeDay(): DayRecord {
     this.expect('open');
-    const ledger = ledgerFor(this.todaysRecords());
+    const ledger = ledgerFor(this.todaysRecords(), this.current.day);
     const savingsAfter = this.current.savings + ledger.net;
     const record: DayRecord = {
       day: this.current.day,

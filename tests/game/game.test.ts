@@ -6,6 +6,7 @@ import { openLibrary } from '../../src/db/openLibrary';
 import { SqliteGameStore } from '../../src/db/repositories/game';
 import { CAMPAIGN_DAYS, kindsUpTo, knownRules, TARGET } from '../../src/game/campaign';
 import { ECONOMY, ledgerFor, reviewFor } from '../../src/game/economy';
+import { faceFor, visibleDifferences } from '../../src/game/faces';
 import { CLOSING_MINUTES, Game } from '../../src/game/Game';
 import { buildEncounter } from '../../src/game/scenarios';
 import { lookup } from '../../src/game/terminal';
@@ -89,6 +90,9 @@ describe('scenarios', () => {
       'return-damaged',
       'valid-renew',
       'renew-limit',
+      'near-fine-limit',
+      'near-loan-limit',
+      'last-renewal',
     ];
     for (const kind of guaranteed) expect(built.has(kind), kind).toBe(true);
   });
@@ -100,12 +104,35 @@ describe('scenarios', () => {
     const mismatch = buildEncounter('someone-elses-card', ctx)!;
     expect(mismatch.card!.name).not.toBe(mismatch.patron.name);
     expect(mismatch.card!.photoSeed).not.toBe(mismatch.patron.memberId);
+    // A look-alike, but never a twin: at least two things you can see are different.
+    expect(visibleDifferences(faceFor(mismatch.card!.photoSeed), faceFor(mismatch.patron.memberId))).toBeGreaterThanOrEqual(2);
     const reference = buildEncounter('reference', ctx)!;
     expect(reference.book.referenceOnly).toBe(true);
     const expired = buildEncounter('expired-card', ctx)!;
     expect(expired.card!.expiresOn < library.clock.today()).toBe(true);
     expect(buildEncounter('return-damaged', ctx)!.book.damaged).toBe(true);
     expect(game.state.day).toBe(1);
+  });
+
+  it('include decoys: honest patrons standing right next to a rule', async () => {
+    const { library } = await newCareer();
+    const ctx = { library, random: new Random(11), day: 7, index: 0, known: knownRules(7), seen: new Set<number>() };
+
+    const owes = buildEncounter('near-fine-limit', ctx)!;
+    const balance = library.fines.balance(owes.patron.memberId);
+    expect(balance).toBeLessThan(library.policy.fineBlockThreshold);
+    expect(balance).toBeGreaterThanOrEqual(library.policy.fineBlockThreshold - 75);
+
+    const busy = buildEncounter('near-loan-limit', ctx)!;
+    const member = library.store.members.findById(busy.patron.memberId)!;
+    expect(library.store.loans.findActiveByMember(member.id)).toHaveLength(library.policy.rulesFor(member.type).maxLoans - 1);
+
+    const renewing = buildEncounter('last-renewal', ctx)!;
+    const loan = library.lending.getLoan(renewing.loanId!);
+    const borrower = library.store.members.findById(loan.memberId)!;
+    expect(loan.renewals).toBe(library.policy.rulesFor(borrower.type).maxRenewals - 1);
+
+    for (const e of [owes, busy, renewing]) expect(truthOf(library, e), e.kind).toEqual([]);
   });
 });
 
@@ -219,8 +246,14 @@ describe('economy', () => {
       citation,
       warning: null,
     });
-    const ledger = ledgerFor([record(true, null), record(true, null), record(false, 'x'), record(false, 'y'), record(false, 'z')]);
-    expect(ledger).toMatchObject({ served: 5, correct: 2, citations: 3, wages: 600, penalties: 500, expenses: 1400, net: -1300 });
+    const records = [record(true, null), record(true, null), record(false, 'x'), record(false, 'y'), record(false, 'z')];
+    expect(ledgerFor(records, 1)).toMatchObject({ served: 5, correct: 2, citations: 3, wages: 600, penalties: 1000, expenses: 1900, net: -2300 });
+  });
+
+  it('sends more bills as the week goes on', () => {
+    expect(ledgerFor([], 1).expenses).toBe(1900);
+    expect(ledgerFor([], 3).expenses).toBe(2300);
+    expect(ledgerFor([], 7).expenses).toBe(2900);
   });
 });
 
@@ -236,15 +269,33 @@ describe('the desk terminal', () => {
     const lost = buildEncounter('lost-card', ctx)!;
     expect(text(lost.card!.number)).toContain('REPORTED LOST');
 
-    const fines = buildEncounter('fines', ctx)!;
-    expect(lookup(library, fines.card!.number).find((l) => l.text.startsWith('OWES'))?.tone).toBe('alert');
-
     const reference = buildEncounter('reference', ctx)!;
     expect(text(reference.book.barcode)).toContain('REFERENCE ONLY');
 
     const renew = buildEncounter('renew-limit', ctx)!;
-    expect(lookup(library, renew.book.barcode).find((l) => l.text.startsWith('RENEWED'))?.tone).toBe('alert');
+    const renewer = library.store.members.findById(renew.patron.memberId)!;
+    expect(text(renew.book.barcode)).toContain(`RENEWED... ${library.policy.rulesFor(renewer.type).maxRenewals} TIMES`);
 
     expect(text('hello')).toContain('SYNTAX ERROR');
+  });
+
+  it('prints the record, not the verdict: the comparing is up to you', async () => {
+    const { library } = await newCareer();
+    const ctx = { library, random: new Random(5), day: 7, index: 0, known: knownRules(7), seen: new Set<number>() };
+
+    const expired = buildEncounter('expired-card', ctx)!;
+    const card = lookup(library, expired.card!.number);
+    expect(card.map((l) => l.text).join('\n')).not.toContain('EXPIRED');
+    expect(card.some((l) => l.tone === 'alert')).toBe(false);
+
+    const fines = buildEncounter('fines', ctx)!;
+    const owes = lookup(library, fines.card!.number).find((l) => l.text.startsWith('OWES'))!;
+    expect(owes.text).not.toContain('LIMIT');
+    expect(owes.tone).toBeUndefined();
+
+    // Every book out is listed with its due date, so an overdue one can be spotted.
+    const busy = buildEncounter('loan-limit', ctx)!;
+    const loans = library.store.loans.findActiveByMember(busy.patron.memberId);
+    expect(lookup(library, busy.card!.number).filter((l) => / DUE /.test(l.text))).toHaveLength(loans.length);
   });
 });

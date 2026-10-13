@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Random } from '../../core/random';
+import { faceFor as faceTraits } from '../../game/faces';
 import type { Mood } from '../../game/types';
 
 const SKIN = ['#f3d6bd', '#e8bf9a', '#d29c74', '#b07a52', '#8a5a3a', '#5e3c26'];
@@ -19,20 +19,10 @@ interface Face {
   eyeGap: number;
 }
 
-/** The same member always has the same face, so regulars are recognisable and photos can be compared. */
+/** The member's face (see game/faces), in colour. */
 function faceFor(seed: number): Face {
-  const r = new Random(Math.imul(seed + 17, 2654435761));
-  return {
-    skin: r.pick(SKIN),
-    hair: r.pick(HAIR),
-    shirt: r.pick(SHIRT),
-    hairStyle: r.int(0, 5),
-    faceWidth: r.int(50, 60),
-    faceHeight: r.int(62, 72),
-    glasses: r.chance(0.3),
-    beard: r.chance(0.15),
-    eyeGap: r.int(18, 24),
-  };
+  const f = faceTraits(seed);
+  return { ...f, skin: SKIN[f.skin]!, hair: HAIR[f.hair]!, shirt: SHIRT[f.shirt]! };
 }
 
 function Hair({ f, back }: { f: Face; back: boolean }) {

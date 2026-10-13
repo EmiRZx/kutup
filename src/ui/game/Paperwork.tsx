@@ -1,5 +1,5 @@
 import { CAMPAIGN_DAYS } from '../../game/campaign';
-import { ECONOMY, reviewFor } from '../../game/economy';
+import { ECONOMY, expensesFor, reviewFor } from '../../game/economy';
 import type { Game } from '../../game/Game';
 import { RULE_NAMES } from '../../game/judge';
 import { rulePages } from '../../game/rulebook';
@@ -108,7 +108,7 @@ export function Ledger({ game }: { game: Game }) {
               </td>
               <td className="num">−{formatMoney(day.penalties)}</td>
             </tr>
-            {ECONOMY.expenses.map((e) => (
+            {expensesFor(day.day).map((e) => (
               <tr key={e.label}>
                 <td>{e.label}</td>
                 <td className="num">−{formatMoney(e.amount)}</td>

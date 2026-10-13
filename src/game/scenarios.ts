@@ -1,4 +1,4 @@
-import { addDays } from '../core/dates';
+import { addDays, isAfter } from '../core/dates';
 import { generateCardNumber } from '../core/identifiers';
 import type { Library } from '../core/Library';
 import type { Book } from '../core/model/Book';
@@ -10,6 +10,7 @@ import type { Violation, ViolationCode } from '../core/model/violations';
 import type { Random } from '../core/random';
 import { REQUEST_OF } from './campaign';
 import { greetingFor } from './dialogue';
+import { faceFor, visibleDifferences } from './faces';
 import type { DeskBook, DeskCard, Encounter, ScenarioKind } from './types';
 
 /**
@@ -65,7 +66,16 @@ function deskBook(library: Library, copy: BookCopy, extra: Partial<DeskBook> = {
   };
 }
 
-function encounter(ctx: ScenarioContext, kind: ScenarioKind, member: Member, card: DeskCard | null, book: DeskBook, loanId: number | null = null): Encounter {
+function encounter(
+  ctx: ScenarioContext,
+  kind: ScenarioKind,
+  member: Member,
+  card: DeskCard | null,
+  book: DeskBook,
+  loanId: number | null = null,
+  /** The name they give at the desk, which isn't always their own. */
+  says: string = member.name,
+): Encounter {
   return {
     day: ctx.day,
     index: ctx.index,
@@ -75,7 +85,7 @@ function encounter(ctx: ScenarioContext, kind: ScenarioKind, member: Member, car
     card,
     book,
     loanId,
-    greeting: greetingFor(kind, member.name, ctx.random),
+    greeting: greetingFor(kind, says, ctx.random),
   };
 }
 
@@ -106,8 +116,17 @@ function usableCard(ctx: ScenarioContext, member: Member): LibraryCard | null {
 }
 
 /** A member with a valid card who could borrow `copy` with no problems at all. */
-function cleanBorrower(ctx: ScenarioContext, copy: BookCopy, exclude: ReadonlySet<number> = new Set()): { member: Member; card: LibraryCard } | null {
-  for (const member of candidates(ctx, (m) => m.isActive && !exclude.has(m.id))) {
+function cleanBorrower(
+  ctx: ScenarioContext,
+  copy: BookCopy,
+  exclude: ReadonlySet<number> = new Set(),
+  cardFilter: (card: LibraryCard) => boolean = () => true,
+): { member: Member; card: LibraryCard } | null {
+  const hasCard = (m: Member) => {
+    const card = usableCard(ctx, m);
+    return card !== null && cardFilter(card);
+  };
+  for (const member of candidates(ctx, (m) => m.isActive && !exclude.has(m.id) && hasCard(m))) {
     const card = usableCard(ctx, member);
     if (card && borrowViolations(ctx, member, card.number, copy).length === 0) return { member, card };
   }
@@ -121,6 +140,17 @@ function withShelfCopy(ctx: ScenarioContext, filter: (b: Book) => boolean, make:
     if (result) return result;
   }
   return null;
+}
+
+/** Lends `member` books off the shelf until they have `count` out. False if the shelf can't oblige. */
+function lendUpTo(ctx: ScenarioContext, member: Member, card: LibraryCard, count: number, keep: BookCopy): boolean {
+  const others = shelfCopies(ctx, lendable).filter((c) => c.id !== keep.id);
+  while (ctx.library.store.loans.findActiveByMember(member.id).length < count) {
+    const next = others.pop();
+    if (!next || borrowViolations(ctx, member, card.number, next).length > 0) return false;
+    ctx.library.lending.checkout({ memberId: member.id, cardNumber: card.number, barcode: next.barcode });
+  }
+  return true;
 }
 
 /** Someone whose own account breaks `target` tries to borrow a perfectly ordinary book. */
@@ -159,13 +189,13 @@ function returnBuilder(kind: 'return-good' | 'return-damaged'): Builder {
 }
 
 /** A renewal request whose only problems are `target` (or none, for an honest one). */
-function renewBuilder(kind: ScenarioKind, target: ViolationCode | null, prepare?: (ctx: ScenarioContext, loan: Loan) => void): Builder {
+function renewBuilder(kind: ScenarioKind, target: ViolationCode | null, prepare?: (ctx: ScenarioContext, loan: Loan) => boolean | void): Builder {
   return (ctx) => {
     for (const { loan, member } of activeLoans(ctx, (_, m) => usableCard(ctx, m) !== null)) {
       // Only nudge loans that are otherwise in order, so the nudge is the whole story.
       if (prepare) {
         if (!ctx.library.lending.checkRenewal(loan.id).allowed) continue;
-        prepare(ctx, loan);
+        if (prepare(ctx, loan) === false) continue;
       }
       const { violations } = ctx.library.lending.checkRenewal(loan.id);
       const ok = target === null ? violations.length === 0 : fair(violations, target, ctx.known);
@@ -198,6 +228,38 @@ const BUILDERS: Record<ScenarioKind, Builder> = {
     return null;
   },
 
+  // Decoys: perfectly good patrons who sit right next to a rule. Refuse them and you've wronged a member.
+  'card-expiring': (ctx) => {
+    const soon = addDays(ctx.library.clock.today(), 2);
+    return withShelfCopy(ctx, lendable, (copy) => {
+      const found = cleanBorrower(ctx, copy, new Set(), (card) => !isAfter(card.expiresOn, soon));
+      return found && encounter(ctx, 'card-expiring', found.member, deskCard(found.card, found.member), deskBook(ctx.library, copy));
+    });
+  },
+
+  'near-fine-limit': (ctx) =>
+    withShelfCopy(ctx, lendable, (copy) => {
+      const found = cleanBorrower(ctx, copy);
+      if (!found) return null;
+      // A late fine or two from last term, just shy of the limit.
+      const gap = ctx.library.policy.fineBlockThreshold - ctx.library.fines.balance(found.member.id) - 25 * ctx.random.int(1, 3);
+      if (gap > 0) ctx.library.fines.charge(found.member.id, gap, 'overdue');
+      if (borrowViolations(ctx, found.member, found.card.number, copy).length > 0) return null;
+      return encounter(ctx, 'near-fine-limit', found.member, deskCard(found.card, found.member), deskBook(ctx.library, copy));
+    }),
+
+  'near-loan-limit': (ctx) =>
+    withShelfCopy(ctx, lendable, (copy) => {
+      // Someone with a short limit: lending a professor nine books just to make a point would empty the shelves.
+      const bigLimits = new Set(ctx.library.members.search('').filter((m) => ctx.library.policy.rulesFor(m.type).maxLoans > 5).map((m) => m.id));
+      const found = cleanBorrower(ctx, copy, bigLimits);
+      if (!found) return null;
+      const limit = ctx.library.policy.rulesFor(found.member.type).maxLoans;
+      if (limit < 2 || !lendUpTo(ctx, found.member, found.card, limit - 1, copy)) return null;
+      if (borrowViolations(ctx, found.member, found.card.number, copy).length > 0) return null;
+      return encounter(ctx, 'near-loan-limit', found.member, deskCard(found.card, found.member), deskBook(ctx.library, copy));
+    }),
+
   'expired-card': accountProblem('expired-card', 'CARD_EXPIRED', (ctx, m) =>
     Boolean(ctx.library.store.cards.findActiveByMember(m.id)?.isExpiredOn(ctx.library.clock.today())),
   ),
@@ -206,9 +268,17 @@ const BUILDERS: Record<ScenarioKind, Builder> = {
     withShelfCopy(ctx, lendable, (copy) => {
       const owner = cleanBorrower(ctx, copy);
       if (!owner) return null;
-      for (const member of candidates(ctx, (m) => m.id !== owner.member.id)) {
+      // Borrowed cards go to people who look a bit like the owner. Later in the week, a lot like them.
+      const ownerFace = faceFor(owner.member.id);
+      const minimum = ctx.day <= 3 ? 3 : 2;
+      const impostors = candidates(ctx, (m) => m.id !== owner.member.id)
+        .map((member) => ({ member, differences: visibleDifferences(faceFor(member.id), ownerFace) }))
+        .filter((c) => c.differences >= minimum)
+        .sort((a, b) => a.differences - b.differences);
+      for (const { member } of impostors) {
         if (fair(borrowViolations(ctx, member, owner.card.number, copy), 'CARD_MISMATCH', ctx.known)) {
-          return encounter(ctx, 'someone-elses-card', member, deskCard(owner.card, owner.member), deskBook(ctx.library, copy));
+          const lies = ctx.day >= 4 && ctx.random.chance(0.5);
+          return encounter(ctx, 'someone-elses-card', member, deskCard(owner.card, owner.member), deskBook(ctx.library, copy), null, lies ? owner.member.name : member.name);
         }
       }
       return null;
@@ -252,13 +322,7 @@ const BUILDERS: Record<ScenarioKind, Builder> = {
       if (!found) return null;
       const { member, card } = found;
       // They already have a stack of books at home: lend them up to the limit first.
-      const limit = ctx.library.policy.rulesFor(member.type).maxLoans;
-      const others = shelfCopies(ctx, lendable).filter((c) => c.id !== copy.id);
-      while (ctx.library.store.loans.findActiveByMember(member.id).length < limit) {
-        const next = others.pop();
-        if (!next || borrowViolations(ctx, member, card.number, next).length > 0) return null;
-        ctx.library.lending.checkout({ memberId: member.id, cardNumber: card.number, barcode: next.barcode });
-      }
+      if (!lendUpTo(ctx, member, card, ctx.library.policy.rulesFor(member.type).maxLoans, copy)) return null;
       if (!fair(borrowViolations(ctx, member, card.number, copy), 'LOAN_LIMIT_REACHED', ctx.known)) return null;
       return encounter(ctx, 'loan-limit', member, deskCard(card, member), deskBook(ctx.library, copy));
     }),
@@ -309,6 +373,14 @@ const BUILDERS: Record<ScenarioKind, Builder> = {
   'return-damaged': returnBuilder('return-damaged'),
 
   'valid-renew': renewBuilder('valid-renew', null),
+  // A decoy: one renewal left, and they're using it.
+  'last-renewal': renewBuilder('last-renewal', null, (ctx, loan) => {
+    const member = ctx.library.store.members.findById(loan.memberId)!;
+    const max = ctx.library.policy.rulesFor(member.type).maxRenewals;
+    if (max < 2) return false;
+    while (ctx.library.lending.getLoan(loan.id).renewals < max - 1) ctx.library.lending.renew(loan.id);
+    return true;
+  }),
   // They have renewed online a couple of times already.
   'renew-limit': renewBuilder('renew-limit', 'RENEWAL_LIMIT_REACHED', (ctx, loan) => {
     while (ctx.library.lending.checkRenewal(loan.id).allowed) ctx.library.lending.renew(loan.id);
