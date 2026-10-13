@@ -12,6 +12,12 @@ source code as it is. The PlantUML sources are in [`src/`](src); every diagram i
 | [Object diagram](object-diagram.svg) | The library on 16 October 2026: a student who owes a damage fee asks to borrow *Hamlet*, and `checkCheckout()` refuses. Every value comes from the running program |
 | [Deployment diagram](deployment-diagram.svg) | Where the system runs: the user's browser (JavaScript, SQLite compiled to WebAssembly, IndexedDB) and the static web server |
 
+The [`simple/`](simple) folder has a **simplified version of the three class diagram sheets**: the same
+classes and relationships, with only public members, getters shown as plain attributes, parameter types left
+out, and the helper modules and repository operations summarised:
+[domain](simple/class-1-domain-simple.svg), [services](simple/class-2-services-simple.svg),
+[storage](simple/class-3-storage-simple.svg).
+
 The [`extra/`](extra) folder has further diagrams that are not part of the library system itself: the desk
 game, the package overview with the React UI, the services' input and output types, and versions of the
 object and deployment diagrams that include the game and the build pipeline.

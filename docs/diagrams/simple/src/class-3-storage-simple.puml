@@ -1,0 +1,74 @@
+@startuml class-3-storage-simple
+!include ../../src/style.iuml
+left to right direction
+title Kutup - Class diagram (simplified), sheet 3 of 3: storage
+
+package "core.repositories" {
+  interface LibraryStore <<interface>> {
+    + transaction(work)
+  }
+  interface AuthorRepository <<interface>>
+  interface BookRepository <<interface>>
+  interface CopyRepository <<interface>>
+  interface MemberRepository <<interface>>
+  interface CardRepository <<interface>>
+  interface LoanRepository <<interface>>
+  interface ReservationRepository <<interface>>
+  interface FineRepository <<interface>>
+  interface PolicyRepository <<interface>> {
+    + load() : LendingPolicy
+    + save(policy)
+  }
+}
+
+package "db (SQLite)" {
+  class SqliteLibraryStore
+  class SqliteDatabase {
+    + {static} open(bytes) : SqliteDatabase
+    + run(sql, params)
+    + all(sql, params) : rows
+    + transaction(work)
+    + export() : file bytes
+  }
+  class SqliteAuthorRepository
+  class SqliteBookRepository
+  class SqliteCopyRepository
+  class SqliteMemberRepository
+  class SqliteCardRepository
+  class SqliteLoanRepository
+  class SqliteReservationRepository
+  class SqliteFineRepository
+  class SqlitePolicyRepository
+  class StoredClock
+}
+
+class ManualClock
+
+LibraryStore o-- AuthorRepository
+LibraryStore o-- BookRepository
+LibraryStore o-- CopyRepository
+LibraryStore o-- MemberRepository
+LibraryStore o-- CardRepository
+LibraryStore o-- LoanRepository
+LibraryStore o-- ReservationRepository
+LibraryStore o-- FineRepository
+LibraryStore o-- PolicyRepository
+
+LibraryStore <|.. SqliteLibraryStore
+AuthorRepository <|.. SqliteAuthorRepository
+BookRepository <|.. SqliteBookRepository
+CopyRepository <|.. SqliteCopyRepository
+MemberRepository <|.. SqliteMemberRepository
+CardRepository <|.. SqliteCardRepository
+LoanRepository <|.. SqliteLoanRepository
+ReservationRepository <|.. SqliteReservationRepository
+FineRepository <|.. SqliteFineRepository
+PolicyRepository <|.. SqlitePolicyRepository
+
+SqliteLibraryStore o-- SqliteDatabase
+ManualClock <|-- StoredClock
+StoredClock --> SqliteDatabase : saves the date
+
+note "Every entity repository offers\nadd, save, findById and its own\nsearches (findByIsbn, findOverdue, ...)." as N
+N .. BookRepository
+@enduml

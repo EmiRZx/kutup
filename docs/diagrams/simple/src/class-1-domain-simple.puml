@@ -1,0 +1,201 @@
+@startuml class-1-domain-simple
+!include ../../src/style.iuml
+title Kutup - Class diagram (simplified), sheet 1 of 3: domain model
+
+package "core.model" {
+
+  class Author {
+    + id : number
+    + name : string
+    + birthYear : number
+  }
+
+  class Book {
+    + id : number
+    + isbn : string
+    + title : string
+    + publishedYear : number
+    + genre : Genre
+    + referenceOnly : boolean
+    --
+    + authorLine() : string
+    + matches(query) : boolean
+  }
+
+  class BookCopy {
+    + id : number
+    + barcode : string
+    + status : CopyStatus
+    + condition : CopyCondition
+    + acquiredOn : date
+    --
+    + checkOut()
+    + checkIn(condition)
+    + placeOnHold()
+    + releaseHold()
+    + markLost()
+    + sendToRepair()
+    + restoreToShelf()
+    + withdraw()
+  }
+
+  class Member {
+    + id : number
+    + name : string
+    + type : MemberType
+    + email : string
+    + status : MemberStatus
+    + joinedOn : date
+    --
+    + suspend()
+    + reinstate()
+  }
+
+  class LibraryCard {
+    + id : number
+    + number : string
+    + issuedOn : date
+    + expiresOn : date
+    + status : CardStatus
+    --
+    + isExpiredOn(date) : boolean
+    + isUsableOn(date) : boolean
+    + extendTo(date)
+    + markLost()
+    + revoke()
+  }
+
+  class Loan {
+    + id : number
+    + borrowedOn : date
+    + dueOn : date
+    + returnedOn : date
+    + renewals : number
+    + overrideNote : string
+    --
+    + isOverdueOn(date) : boolean
+    + daysLate(date) : number
+    + renew(newDueOn)
+    + recordOverride(codes, note)
+    + close(returnedOn)
+  }
+
+  class Reservation {
+    + id : number
+    + createdOn : date
+    + status : ReservationStatus
+    + holdUntil : date
+    --
+    + markReady(copy, holdUntil)
+    + returnToQueue()
+    + fulfill()
+    + expire()
+    + cancel()
+  }
+
+  class Fine {
+    + id : number
+    + amount : number
+    + reason : FineReason
+    + issuedOn : date
+    + status : FineStatus
+    --
+    + pay(on)
+    + waive(on)
+  }
+
+  class LendingPolicy {
+    + dailyFine : number
+    + maxFinePerLoan : number
+    + fineBlockThreshold : number
+    + holdDays : number
+    + blockWhenOverdue : boolean
+    + referenceLoansAllowed : boolean
+    + damageFee : number
+    + lostFee : number
+    --
+    + rulesFor(type) : MemberTypeRules
+    + with(changes) : LendingPolicy
+  }
+
+  class MemberTypeRules {
+    + maxLoans : number
+    + loanDays : number
+    + maxRenewals : number
+    + cardValidityDays : number
+  }
+
+  class Violation {
+    + code : ViolationCode
+    + message : string
+  }
+
+  package "enumerations" {
+    enum CopyStatus <<enumeration>> {
+      available
+      on_loan
+      on_hold
+      in_repair
+      lost
+      withdrawn
+    }
+    enum CopyCondition <<enumeration>> {
+      good
+      worn
+      damaged
+    }
+    enum MemberType <<enumeration>> {
+      student
+      staff
+      guest
+    }
+    enum MemberStatus <<enumeration>> {
+      active
+      suspended
+    }
+    enum CardStatus <<enumeration>> {
+      active
+      lost
+      revoked
+    }
+    enum ReservationStatus <<enumeration>> {
+      waiting
+      ready
+      fulfilled
+      cancelled
+      expired
+    }
+    enum FineReason <<enumeration>> {
+      overdue
+      damage
+      lost
+    }
+    enum FineStatus <<enumeration>> {
+      unpaid
+      paid
+      waived
+    }
+    enum Genre <<enumeration>> {
+      fiction, mystery, drama, ...
+      (12 genres)
+    }
+    enum ViolationCode <<enumeration>> {
+      CARD_EXPIRED, FINES_OUTSTANDING, ...
+      (17 reasons to refuse)
+    }
+  }
+}
+
+Book "0..*" --> "1..*" Author : written by >
+Book "1" -- "0..*" BookCopy : copies >
+Member "1" -- "0..*" LibraryCard : holds >
+Member "1" -- "0..*" Loan : borrows >
+BookCopy "1" -- "0..*" Loan : lent in >
+Member "1" -- "0..*" Reservation : places >
+Book "1" -- "0..*" Reservation : queued for <
+Reservation "0..1" -- "0..1" BookCopy : holds copy >
+Member "1" -- "0..*" Fine : owes >
+Loan "0..1" -- "0..*" Fine : charged for <
+LendingPolicy "1" *-- "3" MemberTypeRules : one per member type
+Book -[hidden]down- Genre
+@enduml

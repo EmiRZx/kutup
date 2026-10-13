@@ -1,0 +1,120 @@
+@startuml class-2-services-simple
+!include ../../src/style.iuml
+title Kutup - Class diagram (simplified), sheet 2 of 3: services
+
+package "core" {
+
+  class Library {
+    + catalog : CatalogService
+    + members : MemberService
+    + lending : LendingService
+    + reservations : ReservationService
+    + fines : FineService
+    + reports : ReportService
+    + policy : LendingPolicy
+    --
+    + openForTheDay()
+  }
+
+  package "services" {
+    class CatalogService {
+      + addBook(input) : Book
+      + addCopies(bookId, count) : BookCopy [*]
+      + search(query) : Book [*]
+      + availability(bookId) : Availability
+      + updateBook(bookId, changes) : Book
+      + sendToRepair(barcode)
+      + restoreToShelf(barcode)
+      + withdraw(barcode)
+    }
+
+    class MemberService {
+      + register(input) : Member
+      + issueCard(memberId) : LibraryCard
+      + reportCardLost(memberId) : LibraryCard
+      + renewCard(memberId) : LibraryCard
+      + suspend(memberId)
+      + reinstate(memberId)
+      + search(query) : Member [*]
+      + summary(memberId) : AccountSummary
+    }
+
+    class LendingService {
+      + checkCheckout(request) : CheckoutAssessment
+      + checkout(request, override) : Loan
+      + checkRenewal(loanId) : RenewalAssessment
+      + renew(loanId, override) : Loan
+      + returnCopy(barcode, condition) : ReturnReceipt
+      + declareLost(loanId)
+      + overdue() : OverdueEntry [*]
+    }
+
+    class ReservationService {
+      + reserve(memberId, bookId) : Reservation
+      + cancel(reservationId)
+      + queuePosition(reservationId) : number
+      + allocate(copy)
+      + expireHolds()
+    }
+
+    class FineService {
+      + chargeOverdue(loan) : Fine
+      + charge(memberId, amount, reason) : Fine
+      + balance(memberId) : number
+      + pay(fineId)
+      + waive(fineId)
+      + payAll(memberId)
+    }
+
+    class ReportService {
+      + snapshot() : LibrarySnapshot
+      + mostBorrowed(limit) : Book [*]
+    }
+  }
+
+  interface Clock <<interface>> {
+    + today() : date
+  }
+  class SystemClock
+  class ManualClock {
+    + set(date)
+    + advance(days)
+  }
+
+  interface LibraryStore <<interface>> {
+    (sheet 3)
+  }
+
+  package "errors" {
+    class LibraryError
+    class NotFoundError
+    class ValidationError
+    class InvalidStateError
+    class PolicyViolationError
+  }
+}
+
+Library *-- "1" CatalogService
+Library *-- "1" MemberService
+Library *-- "1" LendingService
+Library *-- "1" ReservationService
+Library *-- "1" FineService
+Library *-- "1" ReportService
+Library o-- "1" LibraryStore
+Library o-- "1" Clock
+
+CatalogService --> ReservationService
+MemberService --> FineService
+LendingService --> FineService
+LendingService --> ReservationService
+
+Clock <|.. SystemClock
+Clock <|.. ManualClock
+
+LibraryError <|-- NotFoundError
+LibraryError <|-- ValidationError
+LibraryError <|-- InvalidStateError
+LibraryError <|-- PolicyViolationError
+note "Every service reads and writes through\nLibraryStore, asks Clock for today(),\nand throws a LibraryError when a request\nis invalid or breaks a rule." as N
+N .. LendingService
+@enduml
