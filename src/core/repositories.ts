@@ -1,7 +1,7 @@
 import type { IsoDate } from './dates';
 import type { Author, AuthorProps } from './model/Author';
 import type { Book, BookProps } from './model/Book';
-import type { BookCopy, BookCopyProps } from './model/BookCopy';
+import type { BookCopy, BookCopyProps, CopyStatus } from './model/BookCopy';
 import type { Fine, FineProps } from './model/Fine';
 import type { LendingPolicy } from './model/LendingPolicy';
 import type { LibraryCard, LibraryCardProps } from './model/LibraryCard';
@@ -41,6 +41,7 @@ export interface CopyRepository {
   findByBarcode(barcode: string): BookCopy | null;
   findByBook(bookId: number): BookCopy[];
   countByBook(bookId: number): number;
+  countByStatus(): Record<CopyStatus, number>;
 }
 
 export interface MemberRepository {
@@ -70,6 +71,8 @@ export interface LoanRepository {
   /** Active loans whose due date is before `date`. */
   findOverdue(date: IsoDate): Loan[];
   findActive(): Loan[];
+  /** Books ranked by how many times any of their copies has been lent. */
+  mostBorrowed(limit: number): { bookId: number; loans: number }[];
 }
 
 export interface ReservationRepository {
@@ -82,6 +85,8 @@ export interface ReservationRepository {
   /** The ready reservation a copy is currently being held for, if any. */
   findReadyByCopy(copyId: number): Reservation | null;
   findReady(): Reservation[];
+  /** Every waiting or ready reservation, oldest first. */
+  findOpen(): Reservation[];
 }
 
 export interface FineRepository {
@@ -90,6 +95,8 @@ export interface FineRepository {
   findById(id: number): Fine | null;
   findByMember(memberId: number): Fine[];
   findOutstandingByMember(memberId: number): Fine[];
+  /** Sum of all unpaid fines in the library, in cents. */
+  totalOutstanding(): number;
 }
 
 export interface PolicyRepository {

@@ -5,6 +5,11 @@ export type SqlValue = string | number | null | Uint8Array;
 export type Params = Record<string, SqlValue | boolean | undefined>;
 export type Row = Record<string, SqlValue>;
 
+export interface QueryResult {
+  columns: string[];
+  rows: SqlValue[][];
+}
+
 /** sql.js wants `$name` keys; callers write plain `{ name }`. Booleans become 0/1. */
 function bindable(params: Params): Record<string, SqlValue> {
   const out: Record<string, SqlValue> = {};
@@ -94,6 +99,28 @@ export class SqliteDatabase {
     } finally {
       this.transactionDepth = 0;
     }
+  }
+
+  /**
+   * Runs arbitrary SQL typed by a person, with SQLite's `query_only` switch on
+   * so that nothing they type can change the library. Returns one result per
+   * statement that produced rows.
+   */
+  queryReadOnly(sql: string): QueryResult[] {
+    if (this.transactionDepth > 0) throw new Error('Cannot run a console query inside a transaction');
+    this.db.run('PRAGMA query_only = ON');
+    try {
+      return this.db.exec(sql).map((r) => ({ columns: r.columns, rows: r.values }));
+    } finally {
+      this.db.run('PRAGMA query_only = OFF');
+    }
+  }
+
+  /** User tables and how many rows each holds. */
+  tables(): { name: string; rows: number }[] {
+    return this.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    ).map(({ name }) => ({ name, rows: this.get<{ n: number }>(`SELECT count(*) AS n FROM "${name}"`)!.n }));
   }
 
   /** The complete database as bytes: this is the save file. */

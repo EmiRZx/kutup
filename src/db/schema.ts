@@ -131,6 +131,13 @@ const MIGRATIONS: readonly string[] = [
     max_renewals  INTEGER NOT NULL CHECK (max_renewals >= 0)
   );
   `,
+
+  /* 2: the date the library's clock is set to, so a saved library resumes on the same day */ `
+  CREATE TABLE calendar (
+    id     INTEGER PRIMARY KEY CHECK (id = 1),
+    today  TEXT    NOT NULL
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

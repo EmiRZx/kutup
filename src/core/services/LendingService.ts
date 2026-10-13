@@ -1,5 +1,5 @@
 import type { Clock } from '../clock';
-import { addDays, isAfter } from '../dates';
+import { addDays, isAfter, type IsoDate } from '../dates';
 import { InvalidStateError, PolicyViolationError, ValidationError } from '../errors';
 import type { Book } from '../model/Book';
 import type { BookCopy, CopyCondition } from '../model/BookCopy';
@@ -41,6 +41,8 @@ export interface CheckoutAssessment extends Assessment {
   card: LibraryCard | null;
   copy: BookCopy;
   book: Book;
+  /** When the copy would be due back if lent today. */
+  dueOn: IsoDate;
 }
 
 export interface RenewalAssessment extends Assessment {
@@ -128,7 +130,7 @@ export class LendingService {
     }
     if (book.referenceOnly && !policy.referenceLoansAllowed) violations.push(violation('REFERENCE_ONLY'));
 
-    return { ...assess(violations), member, card, copy, book };
+    return { ...assess(violations), member, card, copy, book, dueOn: addDays(today, rules.loanDays) };
   }
 
   /**
@@ -164,7 +166,7 @@ export class LendingService {
         copyId: copy.id,
         memberId: member.id,
         borrowedOn: today,
-        dueOn: addDays(today, this.store.policy.load().rulesFor(member.type).loanDays),
+        dueOn: check.dueOn,
         returnedOn: null,
         renewals: 0,
         overriddenViolations: check.violations.map((v) => v.code),

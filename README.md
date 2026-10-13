@@ -9,8 +9,22 @@ walk up with a card and a book, and you stamp **APPROVED** or **DENIED**. The
 library core acts as the referee: it checks every decision you make against
 the same rules the admin panel enforces.
 
-> 🚧 Work in progress. The core and the database are done; the admin panel and
-> the desk game are next.
+> 🚧 Work in progress. The core, the database and the back office are done;
+> the desk game is next.
+
+## The back office
+
+A complete library administration app on top of the same core:
+
+- **Dashboard**: collection figures, overdue loans with accrued fines, the hold shelf, most borrowed titles.
+- **Circulation desk**: type a card number and a barcode and every lending rule is checked as you type. Librarians
+  can override soft rules with a written reason, which is kept on the loan record.
+- **Catalog** and **Members**: add titles and copies, register members, manage cards, renewals, fines and reservations.
+- **Lending rules**: edit the policy; changes apply to the next request.
+- **Database**: browse every table, read the schema, and run read-only SQL against the live library.
+- **Calendar**: the library runs on its own calendar. *Next day* advances it, so loans fall due and holds expire.
+
+The library is saved in the browser automatically, and can be downloaded as (or opened from) a `.sqlite` file.
 
 ## Architecture
 
@@ -20,9 +34,10 @@ src/core/   Domain model and services in pure TypeScript (no UI, no database)
   services/   CatalogService, MemberService, LendingService, ReservationService, FineService
   Library.ts  Facade that wires the services together
 src/db/     SQLite (sql.js / WebAssembly) implementation of the core's repository interfaces
+src/ui/     React app: title screen and back office (hash routing, no UI framework)
 src/game/   The desk game (planned)
-src/ui/     React: desk scene and admin panel (planned)
 tests/      Vitest suites for the core and the database
+scripts/    Browser end-to-end test and screenshot tool (Puppeteer + local Chrome)
 ```
 
 - **The core never touches the database directly.** It depends on repository
@@ -42,7 +57,11 @@ tests/      Vitest suites for the core and the database
 ```bash
 npm install
 npm run dev        # start the app
-npm test           # run the test suite
+npm test           # unit and integration tests
 npm run typecheck
 npm run build
+
+# against a running build (npx vite preview --port 4173):
+npm run e2e          # end-to-end checks in headless Chrome
+npm run screenshots  # capture every screen into ./screenshots
 ```

@@ -1,5 +1,6 @@
 import initSqlJs, { type SqlJsStatic } from 'sql.js';
 import { ManualClock } from '../src/core/clock';
+import { Random } from '../src/core/random';
 import type { Library } from '../src/core/Library';
 import type { MemberType } from '../src/core/model/Member';
 import { openLibrary } from '../src/db/openLibrary';
@@ -12,16 +13,9 @@ export async function loadSql(): Promise<SqlJsStatic> {
   return sql;
 }
 
-/** A tiny deterministic random source so card numbers are reproducible. */
+/** A deterministic random source so card numbers are reproducible. */
 export function seededRandom(seed = 42): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return new Random(seed).asFunction();
 }
 
 export const START = '2026-03-02';

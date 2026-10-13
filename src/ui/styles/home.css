@@ -1,0 +1,164 @@
+.home {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 56px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  text-align: center;
+}
+
+.home__sign {
+  border: 3px double var(--ink);
+  padding: 20px 44px 22px;
+  background: var(--card);
+  box-shadow: 6px 6px 0 var(--green);
+}
+
+.home__eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.home__title {
+  font-size: clamp(3.5rem, 12vw, 6.5rem);
+  letter-spacing: 0.14em;
+  margin: 4px 0 0 0.14em;
+  line-height: 1;
+}
+
+.home__subtitle {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.5rem;
+  color: var(--ink-soft);
+}
+
+.home__lede {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  line-height: 1.55;
+  max-width: 640px;
+  margin: 0;
+}
+
+.ink-stamp {
+  font-family: var(--font-display);
+  font-size: 0.85em;
+  padding: 0 6px;
+  border: 2px solid currentColor;
+  display: inline-block;
+  transform: rotate(-3deg);
+}
+
+.ink-stamp--ok {
+  color: var(--green);
+}
+
+.ink-stamp--no {
+  color: var(--red);
+  transform: rotate(2deg);
+}
+
+.home__doors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  width: 100%;
+}
+
+.door {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  padding: 22px 24px;
+  background: var(--card);
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 100ms ease, box-shadow 100ms ease;
+}
+
+a.door:hover {
+  color: var(--ink);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.door p {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.08rem;
+  color: var(--ink-soft);
+}
+
+.door__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.door__title {
+  font-size: 1.6rem;
+}
+
+.door__go {
+  margin-top: auto;
+  padding-top: 8px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.door--locked {
+  background: var(--paper-deep);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.door__soon {
+  position: absolute;
+  top: 18px;
+  right: -8px;
+  transform: rotate(8deg);
+  font-family: var(--font-display);
+  color: var(--amber);
+  border: 2px solid var(--amber);
+  padding: 0 8px;
+  background: var(--card);
+}
+
+.home__foot {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.boot {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  padding: 16px;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .home {
+    padding-top: 32px;
+  }
+
+  .home__sign {
+    padding: 16px 20px;
+  }
+
+  .home__doors {
+    grid-template-columns: 1fr;
+  }
+}

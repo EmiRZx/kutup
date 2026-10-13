@@ -17,6 +17,7 @@ describe('SqliteDatabase', () => {
       'book_authors',
       'book_copies',
       'books',
+      'calendar',
       'fines',
       'lending_policy',
       'library_cards',
@@ -104,5 +105,68 @@ describe('seed data', () => {
     expect(emailFor('Prof. Ayşe Arslan')).toBe('ayse.arslan@kutup.edu');
     expect(emailFor('Elif Yılmaz')).toBe('elif.yilmaz@kutup.edu');
     expect(emailFor('Dr. Kemal Öztürk')).toBe('kemal.ozturk@kutup.edu');
+  });
+});
+
+describe('reports and the console', () => {
+  it('summarises the library', async () => {
+    const { library, clock } = await freshLibrary();
+    const alice = addMember(library);
+    const { barcodes } = addBook(library, 'Popular', 2);
+    addBook(library, 'Unread');
+    lend(library, alice, barcodes[0]!);
+    library.lending.returnCopy(barcodes[0]!);
+    lend(library, alice, barcodes[1]!);
+    clock.advance(20);
+    expect(library.reports.snapshot()).toMatchObject({
+      titles: 2,
+      totalCopies: 3,
+      members: 1,
+      activeLoans: 1,
+      overdueLoans: 1,
+      outstandingFines: 0,
+    });
+    expect(library.reports.mostBorrowed().map((r) => [r.book.title, r.loans])).toEqual([['Popular', 2]]);
+  });
+
+  it('answers SELECTs but refuses to change anything', async () => {
+    const { library, db } = await freshLibrary();
+    addMember(library, 'Alice');
+    const [result] = db.queryReadOnly('SELECT name, type FROM members');
+    expect(result).toEqual({ columns: ['name', 'type'], rows: [['Alice', 'student']] });
+    expect(() => db.queryReadOnly('DELETE FROM members')).toThrow(/readonly|read-only|query_only/i);
+    expect(db.all('SELECT * FROM members')).toHaveLength(1);
+    addMember(library, 'Bob'); // writes work again afterwards
+    expect(db.tables().find((t) => t.name === 'members')?.rows).toBe(2);
+  });
+});
+
+describe('StoredClock', () => {
+  it('resumes a saved library on the day it was left', async () => {
+    const sql = await loadSql();
+    const first = openLibrary(sql, { startDate: '2026-03-02' });
+    expect(first.clock.today()).toBe('2026-03-02');
+    (first.clock as ManualClock).advance(5);
+    const reopened = openLibrary(sql, { startDate: '2030-01-01', bytes: first.db.export() });
+    expect(reopened.clock.today()).toBe('2026-03-07');
+  });
+});
+
+describe('sample activity', () => {
+  it('produces a lived-in library ending on the start date, deterministically', async () => {
+    const sql = await loadSql();
+    const open = () => openLibrary(sql, { startDate: '2026-10-13', seed: true, sampleActivityDays: 30 });
+    const a = open();
+    const b = open();
+    expect(a.clock.today()).toBe('2026-10-13');
+    const snapshot = a.library.reports.snapshot();
+    expect(snapshot.activeLoans).toBeGreaterThan(5);
+    expect(snapshot.overdueLoans).toBeGreaterThan(0);
+    expect(a.db.all('SELECT * FROM loans WHERE returned_on IS NOT NULL').length).toBeGreaterThan(10);
+    expect(a.db.all('SELECT * FROM fines').length).toBeGreaterThan(0);
+    expect(a.db.all('SELECT * FROM reservations').length).toBeGreaterThan(0);
+    expect(b.library.reports.snapshot()).toEqual(snapshot);
+    // Every loan in the sample is legitimate: no overrides were needed.
+    expect(a.db.all('SELECT * FROM loan_overrides')).toEqual([]);
   });
 });

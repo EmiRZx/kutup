@@ -5,6 +5,7 @@ import { CatalogService } from './services/CatalogService';
 import { FineService } from './services/FineService';
 import { LendingService } from './services/LendingService';
 import { MemberService, type MemberServiceOptions } from './services/MemberService';
+import { ReportService } from './services/ReportService';
 import { ReservationService } from './services/ReservationService';
 
 /**
@@ -19,6 +20,7 @@ export class Library {
   readonly lending: LendingService;
   readonly reservations: ReservationService;
   readonly fines: FineService;
+  readonly reports: ReportService;
 
   constructor(store: LibraryStore, clock: Clock, options: MemberServiceOptions = {}) {
     this.store = store;
@@ -28,6 +30,7 @@ export class Library {
     this.catalog = new CatalogService(store, clock, this.reservations);
     this.members = new MemberService(store, clock, this.fines, options);
     this.lending = new LendingService(store, clock, this.fines, this.reservations);
+    this.reports = new ReportService(store, clock);
   }
 
   get policy(): LendingPolicy {

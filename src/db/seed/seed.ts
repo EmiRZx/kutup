@@ -34,9 +34,23 @@ const SEED_MEMBERS: readonly [string, MemberType][] = [
   ['Zeynep Demir', 'student'],
   ['Arda Şahin', 'student'],
   ['Selin Çelik', 'student'],
+  ['Deniz Aydın', 'student'],
+  ['Can Polat', 'student'],
+  ['Ece Korkmaz', 'student'],
+  ['Baran Yıldız', 'student'],
+  ['Defne Koç', 'student'],
+  ['Omar Haddad', 'student'],
+  ['Lena Novak', 'student'],
+  ['Kofi Mensah', 'student'],
+  ['Mei Lin', 'student'],
+  ['Lucas Moreau', 'student'],
   ['Prof. Ayşe Arslan', 'staff'],
   ['Dr. Kemal Öztürk', 'staff'],
+  ['Dr. Sofia Rossi', 'staff'],
+  ['Hasan Erdem', 'staff'],
   ['Hannah Becker', 'guest'],
+  ['Tomás García', 'guest'],
+  ['Nur Aksoy', 'guest'],
 ];
 
 /** "Prof. Ayşe Arslan" -> "ayse.arslan@kutup.edu" */

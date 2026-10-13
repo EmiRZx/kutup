@@ -1,0 +1,108 @@
+/* Kutup: a 1980s municipal library, rendered in paper, ink and rubber stamps. */
+
+:root {
+  --paper: #f3ead6;
+  --paper-deep: #e9dcc0;
+  --card: #fbf6ea;
+  --card-line: #c8d6e4;
+  --ink: #2a2118;
+  --ink-soft: #55463a;
+  --muted: #86765f;
+  --rule: #d4c4a4;
+  --rule-strong: #b9a682;
+
+  --green: #2f5d50;
+  --green-soft: #dfe8df;
+  --red: #9e3328;
+  --red-soft: #f2dcd5;
+  --amber: #9a6a14;
+  --amber-soft: #f3e5c3;
+  --blue: #2f5873;
+  --blue-soft: #dae4ea;
+
+  --font-display: 'Special Elite', 'Courier New', monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --font-serif: 'Crimson Pro', Georgia, serif;
+
+  --radius: 3px;
+  --shadow-card: 0 1px 0 rgba(42, 33, 24, 0.08), 0 6px 16px -8px rgba(42, 33, 24, 0.35);
+
+  color-scheme: light;
+  font: 15px/1.5 var(--font-mono);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--paper);
+  /* A faint paper grain. */
+  background-image:
+    radial-gradient(rgba(120, 90, 50, 0.05) 1px, transparent 1px),
+    radial-gradient(rgba(120, 90, 50, 0.04) 1px, transparent 1px);
+  background-size: 7px 7px, 11px 11px;
+  background-position: 0 0, 3px 5px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.15;
+  margin: 0;
+}
+
+a {
+  color: var(--green);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.book-title {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.08em;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

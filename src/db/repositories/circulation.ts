@@ -96,6 +96,17 @@ export class SqliteLoanRepository implements LoanRepository {
     return this.many('SELECT * FROM loans WHERE returned_on IS NULL ORDER BY due_on, id');
   }
 
+  mostBorrowed(limit: number): { bookId: number; loans: number }[] {
+    return this.db
+      .all<{ book_id: number; loans: number }>(
+        `SELECT c.book_id, count(*) AS loans
+         FROM loans l JOIN book_copies c ON c.id = l.copy_id
+         GROUP BY c.book_id ORDER BY loans DESC, c.book_id LIMIT $limit`,
+        { limit },
+      )
+      .map((r) => ({ bookId: r.book_id, loans: r.loans }));
+  }
+
   private writeOverrides(loanId: number, codes: readonly ViolationCode[]): void {
     this.db.run('DELETE FROM loan_overrides WHERE loan_id = $loanId', { loanId });
     for (const code of codes) {
@@ -203,6 +214,12 @@ export class SqliteReservationRepository implements ReservationRepository {
       .all<ReservationRow>("SELECT * FROM reservations WHERE status = 'ready' ORDER BY hold_until, id")
       .map(toReservation);
   }
+
+  findOpen(): Reservation[] {
+    return this.db
+      .all<ReservationRow>("SELECT * FROM reservations WHERE status IN ('waiting', 'ready') ORDER BY created_on, id")
+      .map(toReservation);
+  }
 }
 
 const toFine = (r: FineRow) =>
@@ -250,6 +267,10 @@ export class SqliteFineRepository implements FineRepository {
     return this.db
       .all<FineRow>('SELECT * FROM fines WHERE member_id = $memberId ORDER BY issued_on DESC, id DESC', { memberId })
       .map(toFine);
+  }
+
+  totalOutstanding(): number {
+    return this.db.get<{ total: number }>("SELECT coalesce(sum(amount), 0) AS total FROM fines WHERE status = 'unpaid'")!.total;
   }
 
   findOutstandingByMember(memberId: number): Fine[] {

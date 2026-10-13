@@ -1,6 +1,6 @@
 import { Author, type AuthorProps } from '../../core/model/Author';
 import { Book, isGenre, type BookProps } from '../../core/model/Book';
-import { BookCopy, type BookCopyProps, type CopyCondition, type CopyStatus } from '../../core/model/BookCopy';
+import { BookCopy, COPY_STATUSES, type BookCopyProps, type CopyCondition, type CopyStatus } from '../../core/model/BookCopy';
 import type { AuthorRepository, BookRepository, CopyRepository, Draft } from '../../core/repositories';
 import type { SqliteDatabase } from '../SqliteDatabase';
 
@@ -186,5 +186,13 @@ export class SqliteCopyRepository implements CopyRepository {
 
   countByBook(bookId: number): number {
     return this.db.get<{ n: number }>('SELECT count(*) AS n FROM book_copies WHERE book_id = $bookId', { bookId })!.n;
+  }
+
+  countByStatus(): Record<CopyStatus, number> {
+    const counts = Object.fromEntries(COPY_STATUSES.map((s) => [s, 0])) as Record<CopyStatus, number>;
+    for (const row of this.db.all<{ status: string; n: number }>('SELECT status, count(*) AS n FROM book_copies GROUP BY status')) {
+      counts[row.status as CopyStatus] = row.n;
+    }
+    return counts;
   }
 }
