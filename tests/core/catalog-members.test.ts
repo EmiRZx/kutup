@@ -77,6 +77,11 @@ describe('MemberService', () => {
     expect(library.members.findByCardNumber(card.printedNumber)?.member.id).toBe(member.id);
   });
 
+  it('issues cards valid for as long as the membership type allows', () => {
+    expect(library.members.register({ name: 'Visitor', type: 'guest' }).card.expiresOn).toBe('2026-04-01');
+    expect(library.members.register({ name: 'Prof', type: 'staff' }).card.expiresOn).toBe('2028-03-01');
+  });
+
   it('validates registrations', () => {
     expect(() => library.members.register({ name: '', type: 'student' })).toThrow(ValidationError);
     expect(() => library.members.register({ name: 'A', type: 'student', email: 'not-an-email' })).toThrow(ValidationError);

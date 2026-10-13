@@ -13,7 +13,13 @@ type PolicyRow = {
   damage_fee: number;
   lost_fee: number;
 };
-type RulesRow = { member_type: string; max_loans: number; loan_days: number; max_renewals: number };
+type RulesRow = {
+  member_type: string;
+  max_loans: number;
+  loan_days: number;
+  max_renewals: number;
+  card_validity_days: number;
+};
 
 export class SqlitePolicyRepository implements PolicyRepository {
   private readonly db: SqliteDatabase;
@@ -27,7 +33,12 @@ export class SqlitePolicyRepository implements PolicyRepository {
     if (!p) throw new Error('The lending_policy table is empty');
     const rules = {} as Record<MemberType, MemberTypeRules>;
     for (const r of this.db.all<RulesRow>('SELECT * FROM member_type_rules')) {
-      rules[r.member_type as MemberType] = { maxLoans: r.max_loans, loanDays: r.loan_days, maxRenewals: r.max_renewals };
+      rules[r.member_type as MemberType] = {
+        maxLoans: r.max_loans,
+        loanDays: r.loan_days,
+        maxRenewals: r.max_renewals,
+        cardValidityDays: r.card_validity_days,
+      };
     }
     return new LendingPolicy({
       rules,
@@ -62,7 +73,8 @@ export class SqlitePolicyRepository implements PolicyRepository {
       );
       for (const [type, r] of Object.entries(policy.rules)) {
         this.db.run(
-          `UPDATE member_type_rules SET max_loans = $maxLoans, loan_days = $loanDays, max_renewals = $maxRenewals
+          `UPDATE member_type_rules SET max_loans = $maxLoans, loan_days = $loanDays, max_renewals = $maxRenewals,
+             card_validity_days = $cardValidityDays
            WHERE member_type = $type`,
           { type, ...r },
         );

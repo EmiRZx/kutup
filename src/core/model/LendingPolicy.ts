@@ -6,6 +6,8 @@ export interface MemberTypeRules {
   maxLoans: number;
   loanDays: number;
   maxRenewals: number;
+  /** How long a newly issued or renewed card of this type stays valid. */
+  cardValidityDays: number;
 }
 
 export interface LendingPolicyProps {
@@ -62,9 +64,9 @@ export class LendingPolicy implements LendingPolicyProps {
   static defaults(): LendingPolicy {
     return new LendingPolicy({
       rules: {
-        student: { maxLoans: 5, loanDays: 14, maxRenewals: 2 },
-        staff: { maxLoans: 10, loanDays: 28, maxRenewals: 3 },
-        guest: { maxLoans: 2, loanDays: 7, maxRenewals: 0 },
+        student: { maxLoans: 5, loanDays: 14, maxRenewals: 2, cardValidityDays: 365 },
+        staff: { maxLoans: 10, loanDays: 28, maxRenewals: 3, cardValidityDays: 730 },
+        guest: { maxLoans: 2, loanDays: 7, maxRenewals: 0, cardValidityDays: 30 },
       },
       dailyFine: 25,
       maxFinePerLoan: 1000,
@@ -113,6 +115,9 @@ export class LendingPolicy implements LendingPolicyProps {
       nonNegative(`${type}.maxLoans`, r.maxLoans);
       nonNegative(`${type}.maxRenewals`, r.maxRenewals);
       if (!Number.isInteger(r.loanDays) || r.loanDays < 1) throw new ValidationError(`${type}.loanDays must be ≥ 1`);
+      if (!Number.isInteger(r.cardValidityDays) || r.cardValidityDays < 1) {
+        throw new ValidationError(`${type}.cardValidityDays must be ≥ 1`);
+      }
     }
     nonNegative('dailyFine', props.dailyFine);
     nonNegative('maxFinePerLoan', props.maxFinePerLoan);

@@ -138,6 +138,58 @@ const MIGRATIONS: readonly string[] = [
     today  TEXT    NOT NULL
   );
   `,
+
+  /* 3: card validity depends on the membership type (guest cards last a month) */ `
+  ALTER TABLE member_type_rules
+    ADD COLUMN card_validity_days INTEGER NOT NULL DEFAULT 365 CHECK (card_validity_days >= 1);
+  UPDATE member_type_rules SET card_validity_days = 730 WHERE member_type = 'staff';
+  UPDATE member_type_rules SET card_validity_days = 30  WHERE member_type = 'guest';
+  `,
+
+  /* 4: the desk game. These tables belong to the game layer; the library core never reads them. */ `
+  -- The player's career: one row.
+  CREATE TABLE game_career (
+    id        INTEGER PRIMARY KEY CHECK (id = 1),
+    day       INTEGER NOT NULL CHECK (day >= 1),
+    savings   INTEGER NOT NULL,
+    status    TEXT    NOT NULL CHECK (status IN ('morning', 'open', 'evening', 'review', 'fired')),
+    seed      INTEGER NOT NULL,
+    minutes   INTEGER NOT NULL DEFAULT 0 CHECK (minutes >= 0),
+    endless   INTEGER NOT NULL DEFAULT 0 CHECK (endless IN (0, 1)),
+    bulletin  TEXT    NOT NULL
+  );
+
+  -- Every patron served at the desk, and how the player handled them.
+  CREATE TABLE game_encounters (
+    id           INTEGER PRIMARY KEY,
+    day          INTEGER NOT NULL,
+    position     INTEGER NOT NULL,
+    kind         TEXT    NOT NULL,
+    request      TEXT    NOT NULL CHECK (request IN ('borrow', 'return', 'renew')),
+    member_id    INTEGER NOT NULL REFERENCES members(id),
+    barcode      TEXT    NOT NULL REFERENCES book_copies(barcode),
+    card_number  TEXT,
+    decision     TEXT    NOT NULL CHECK (decision IN ('approve', 'deny', 'check-in')),
+    reason       TEXT,
+    correct      INTEGER NOT NULL CHECK (correct IN (0, 1)),
+    citation     TEXT,
+    warning      TEXT,
+    UNIQUE (day, position)
+  );
+
+  -- The evening ledger of each working day.
+  CREATE TABLE game_days (
+    day            INTEGER PRIMARY KEY,
+    date           TEXT    NOT NULL,
+    served         INTEGER NOT NULL,
+    correct        INTEGER NOT NULL,
+    citations      INTEGER NOT NULL,
+    wages          INTEGER NOT NULL,
+    penalties      INTEGER NOT NULL,
+    expenses       INTEGER NOT NULL,
+    savings_after  INTEGER NOT NULL
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
@@ -173,6 +225,12 @@ function seedDefaultPolicy(db: SqliteDatabase): void {
     },
   );
   for (const [type, r] of Object.entries(p.rules)) {
-    db.run('INSERT INTO member_type_rules VALUES ($type, $maxLoans, $loanDays, $maxRenewals)', { type, ...r });
+    // Migration 1's columns only; later migrations fill in their own defaults.
+    db.run('INSERT INTO member_type_rules VALUES ($type, $maxLoans, $loanDays, $maxRenewals)', {
+      type,
+      maxLoans: r.maxLoans,
+      loanDays: r.loanDays,
+      maxRenewals: r.maxRenewals,
+    });
   }
 }

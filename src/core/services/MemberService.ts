@@ -38,8 +38,6 @@ export interface AccountSummary {
 }
 
 export interface MemberServiceOptions {
-  /** How long a newly issued or renewed card stays valid. */
-  cardValidityDays?: number;
   /** Source of randomness for card numbers; injectable so tests are deterministic. */
   random?: () => number;
 }
@@ -51,14 +49,12 @@ export class MemberService {
   private readonly store: LibraryStore;
   private readonly clock: Clock;
   private readonly fines: FineService;
-  private readonly cardValidityDays: number;
   private readonly random: () => number;
 
   constructor(store: LibraryStore, clock: Clock, fines: FineService, options: MemberServiceOptions = {}) {
     this.store = store;
     this.clock = clock;
     this.fines = fines;
-    this.cardValidityDays = options.cardValidityDays ?? 365;
     this.random = options.random ?? Math.random;
   }
 
@@ -87,7 +83,7 @@ export class MemberService {
    */
   issueCard(memberId: number): LibraryCard {
     return this.store.transaction(() => {
-      this.get(memberId);
+      const member = this.get(memberId);
       const current = this.store.cards.findActiveByMember(memberId);
       if (current) {
         current.revoke();
@@ -98,7 +94,7 @@ export class MemberService {
         memberId,
         number: this.unusedCardNumber(),
         issuedOn: today,
-        expiresOn: addDays(today, this.cardValidityDays),
+        expiresOn: addDays(today, this.cardValidityDays(member)),
         status: 'active',
       });
     });
@@ -122,7 +118,7 @@ export class MemberService {
       if (!card) throw new InvalidStateError(`Member ${memberId} has no active card`);
       const today = this.clock.today();
       const base = card.isExpiredOn(today) ? today : card.expiresOn;
-      card.extendTo(addDays(base, this.cardValidityDays));
+      card.extendTo(addDays(base, this.cardValidityDays(this.get(memberId))));
       this.store.cards.save(card);
       return card;
     });
@@ -190,6 +186,10 @@ export class MemberService {
     const copy = found(this.store.copies.findById(loan.copyId), 'Copy', loan.copyId);
     const book = found(this.store.books.findById(copy.bookId), 'Book', copy.bookId);
     return { loan, copy, book };
+  }
+
+  private cardValidityDays(member: Member): number {
+    return this.store.policy.load().rulesFor(member.type).cardValidityDays;
   }
 
   private unusedCardNumber(): string {

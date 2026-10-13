@@ -56,13 +56,14 @@ export function PolicyPage() {
                 <th>Books at once</th>
                 <th>Loan period (days)</th>
                 <th>Renewals</th>
+                <th>Card valid (days)</th>
               </tr>
             </thead>
             <tbody>
               {MEMBER_TYPES.map((type) => (
                 <tr key={type}>
                   <td>{MEMBER_TYPE[type]}</td>
-                  {(['maxLoans', 'loanDays', 'maxRenewals'] as const).map((key) => (
+                  {(['maxLoans', 'loanDays', 'maxRenewals', 'cardValidityDays'] as const).map((key) => (
                     <td key={key}>
                       <input
                         className="input"
@@ -118,7 +119,7 @@ export function PolicyPage() {
 }
 
 type Draft = {
-  rules: Record<(typeof MEMBER_TYPES)[number], { maxLoans: string; loanDays: string; maxRenewals: string }>;
+  rules: Record<(typeof MEMBER_TYPES)[number], { maxLoans: string; loanDays: string; maxRenewals: string; cardValidityDays: string }>;
   holdDays: string;
   blockWhenOverdue: boolean;
   referenceLoansAllowed: boolean;
@@ -128,7 +129,12 @@ function toDraft(p: LendingPolicy): Draft {
   const rules = {} as Draft['rules'];
   for (const t of MEMBER_TYPES) {
     const r = p.rulesFor(t);
-    rules[t] = { maxLoans: String(r.maxLoans), loanDays: String(r.loanDays), maxRenewals: String(r.maxRenewals) };
+    rules[t] = {
+      maxLoans: String(r.maxLoans),
+      loanDays: String(r.loanDays),
+      maxRenewals: String(r.maxRenewals),
+      cardValidityDays: String(r.cardValidityDays),
+    };
   }
   const money = Object.fromEntries(MONEY_FIELDS.map(({ key }) => [key, (p[key] / 100).toFixed(2)])) as Record<MoneyKey, string>;
   return { rules, holdDays: String(p.holdDays), blockWhenOverdue: p.blockWhenOverdue, referenceLoansAllowed: p.referenceLoansAllowed, ...money };
@@ -140,11 +146,16 @@ function fromDraft(d: Draft): LendingPolicyProps | string {
   const rules = {} as LendingPolicyProps['rules'];
   for (const t of MEMBER_TYPES) {
     const r = d.rules[t];
-    const values = [whole(r.maxLoans, `${MEMBER_TYPE[t]} books at once`), whole(r.loanDays, `${MEMBER_TYPE[t]} loan period`), whole(r.maxRenewals, `${MEMBER_TYPE[t]} renewals`)];
+    const values = [
+      whole(r.maxLoans, `${MEMBER_TYPE[t]} books at once`),
+      whole(r.loanDays, `${MEMBER_TYPE[t]} loan period`),
+      whole(r.maxRenewals, `${MEMBER_TYPE[t]} renewals`),
+      whole(r.cardValidityDays, `${MEMBER_TYPE[t]} card validity`),
+    ];
     const error = values.find((v) => typeof v === 'string');
     if (error !== undefined) return error as string;
-    const [maxLoans, loanDays, maxRenewals] = values as number[];
-    rules[t] = { maxLoans: maxLoans!, loanDays: loanDays!, maxRenewals: maxRenewals! };
+    const [maxLoans, loanDays, maxRenewals, cardValidityDays] = values as number[];
+    rules[t] = { maxLoans: maxLoans!, loanDays: loanDays!, maxRenewals: maxRenewals!, cardValidityDays: cardValidityDays! };
   }
   const money = {} as Record<MoneyKey, number>;
   for (const { key, label } of MONEY_FIELDS) {
